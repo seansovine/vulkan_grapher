@@ -1,9 +1,15 @@
+# Build a library from the subset of ImGui that we use.
+
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/thirdparty/imgui)
 set(IMGUI_SRCS
-    imgui.cpp
-    imgui_draw.cpp
-    imgui_impl_glfw.cpp
-    imgui_impl_vulkan.cpp
-    imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
 )
 add_library(imgui-renderer ${IMGUI_SRCS})
-target_include_directories(imgui-renderer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Include thirdparty dir so we can use includes relative to imgui for clarity.
+target_include_directories(imgui-renderer PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/..)

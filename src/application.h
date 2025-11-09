@@ -167,7 +167,9 @@ private:
     VkDescriptorPool uiDescriptorPool;
 
     std::vector<const char *> requiredExtensions;
-    const std::array<const char *, 1> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    const std::array<const char *, 1> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME //
+    };
     const std::array<const char *, 1> validationLayers = {
         "VK_LAYER_KHRONOS_validation",
     };

@@ -2,9 +2,9 @@
 
 #include "shaderloader.h"
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_vulkan.h"
+#include <imgui/imgui.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_vulkan.h>
 
 #include <iostream>
 #include <set>
@@ -510,6 +510,7 @@ void Application::createInstance() {
     applicationInfo.pEngineName = "No Engine";
     applicationInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     applicationInfo.apiVersion = VK_API_VERSION_1_2;
+    applicationInfo.pNext = nullptr;
 
     // Grab the needed Vulkan extensions. This also initializes the list of required extensions
     requiredExtensions = getRequiredExtensions();
@@ -1037,13 +1038,18 @@ void Application::initUI() {
     init_info.DescriptorPool = uiDescriptorPool;
     init_info.MinImageCount = imageCount;
     init_info.ImageCount = imageCount;
-    ImGui_ImplVulkan_Init(&init_info, uiRenderPass);
+    init_info.PipelineInfoMain.RenderPass = uiRenderPass;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    ImGui_ImplVulkan_Init(&init_info);
+    // Before upgrade.
+    // ImGui_ImplVulkan_Init(&init_info, uiRenderPass);
 
-    // Upload the fonts for DearImgui
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(uiCommandPool);
-    ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    endSingleTimeCommands(commandBuffer, uiCommandPool);
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
+    // // Upload the fonts for DearImgui
+    // VkCommandBuffer commandBuffer = beginSingleTimeCommands(uiCommandPool);
+    // ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+    // endSingleTimeCommands(commandBuffer, uiCommandPool);
+    // ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 void Application::initVulkan() {
