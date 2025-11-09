@@ -3,19 +3,11 @@
 #include <array>
 #include <cstring>
 #include <iostream>
-#include <unordered_map>
-#include <set>
-#include <string>
 #include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_vulkan.h"
-
-#include "shaderloader.h"
 
 class Application {
 public:
