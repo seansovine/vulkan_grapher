@@ -1042,14 +1042,6 @@ void Application::initUI() {
     init_info.PipelineInfoMain.Subpass = 0;
     init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     ImGui_ImplVulkan_Init(&init_info);
-    // Before upgrade.
-    // ImGui_ImplVulkan_Init(&init_info, uiRenderPass);
-
-    // // Upload the fonts for DearImgui
-    // VkCommandBuffer commandBuffer = beginSingleTimeCommands(uiCommandPool);
-    // ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    // endSingleTimeCommands(commandBuffer, uiCommandPool);
-    // ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 void Application::initVulkan() {
