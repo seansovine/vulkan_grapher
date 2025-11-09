@@ -8,7 +8,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-
 class Application {
 public:
     Application();
@@ -30,9 +29,12 @@ private:
         std::vector<VkPresentModeKHR> presentModes;
     };
 
-    static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                                 const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
-        auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
+                                                 const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                                 const VkAllocationCallbacks *pAllocator,
+                                                 VkDebugUtilsMessengerEXT *pDebugMessenger) {
+        auto func =
+            (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr) {
             return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
         } else {
@@ -40,29 +42,28 @@ private:
         }
     }
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-            VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-            VkDebugUtilsMessageTypeFlagsEXT messageType,
-            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-            void* pUserData) {
-
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                        VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                                        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                                        void *pUserData) {
         std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
 
         return VK_FALSE;
     }
 
     static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-                                              const VkAllocationCallbacks* pAllocator) {
-        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+                                              const VkAllocationCallbacks *pAllocator) {
+        auto func =
+            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func != nullptr) {
             func(instance, debugMessenger, pAllocator);
         }
     }
 
-    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
-    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+    static void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
+        auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
     }
 
@@ -132,7 +133,7 @@ private:
 
     void getDeviceQueueIndices();
 
-    std::vector<const char*> getRequiredExtensions() const;
+    std::vector<const char *> getRequiredExtensions() const;
 
     void initUI();
 
@@ -158,6 +159,7 @@ private:
 
     void setupDebugMessenger();
 
+private:
     const uint32_t WINDOW_WIDTH = 1200;
     const uint32_t WINDOW_HEIGHT = 900;
 
@@ -204,23 +206,21 @@ private:
 
     bool framebufferResized = false;
 
-    std::vector<const char*> requiredExtensions;
+    std::vector<const char *> requiredExtensions;
 
-    const std::array<const char*, 1> validationLayers = {
+    const std::array<const char *, 1> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+    const std::array<const char *, 1> validationLayers = {
         "VK_LAYER_KHRONOS_validation",
-    };
-
-    const std::array<const char*, 1> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
     QueueFamilyIndices queueIndices;
 
     // Debug utilities
     VkDebugUtilsMessengerEXT debugMessenger;
-    #ifdef NDEBUG
-        const bool enableValidationLayers = false;
-    #else
-        const bool enableValidationLayers = true;
-    #endif
+#ifdef NDEBUG
+    const bool enableValidationLayers = false;
+#else
+    const bool enableValidationLayers = true;
+#endif
 };

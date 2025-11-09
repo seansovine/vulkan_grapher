@@ -1,0 +1,15 @@
+ColumnLimit: 120
+IndentWidth: 4
+AccessModifierOffset: -4
+
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: None
+AllowShortEnumsOnASingleLine: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterEnum: false
+  SplitEmptyFunction: false
+
+PackConstructorInitializers: Never

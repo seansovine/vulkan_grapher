@@ -6,7 +6,6 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
 
-#include <unordered_map>
 #include <set>
 #include <string>
 
@@ -101,7 +100,7 @@ bool Application::checkDeviceExtensions(VkPhysicalDevice device) {
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, availableExtensions.data());
 
     std::set<std::string> requiredDeviceExtensions(deviceExtensions.begin(), deviceExtensions.end());
-    for (const auto& extension : availableExtensions) {
+    for (const auto &extension : availableExtensions) {
         requiredDeviceExtensions.erase(extension.extensionName);
     }
 
@@ -115,9 +114,9 @@ bool Application::checkValidationLayerSupport() {
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    for (const char* layerName : validationLayers) {
+    for (const char *layerName : validationLayers) {
         bool layerFound = false;
-        for (const auto& layerProperties : availableLayers) {
+        for (const auto &layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -156,8 +155,8 @@ void Application::cleanupUIResources() {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     }
 
-    vkFreeCommandBuffers(logicalDevice, uiCommandPool,
-                         static_cast<uint32_t>(uiCommandBuffers.size()), uiCommandBuffers.data());
+    vkFreeCommandBuffers(logicalDevice, uiCommandPool, static_cast<uint32_t>(uiCommandBuffers.size()),
+                         uiCommandBuffers.data());
 }
 
 void Application::createCommandBuffers() {
@@ -246,8 +245,7 @@ void Application::createFramebuffers() {
         framebufferInfo.height = swapchainExtent.height;
         framebufferInfo.layers = 1;
 
-        if (vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr,
-                                &swapchainFramebuffers[i]) != VK_SUCCESS) {
+        if (vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create framebuffer!");
         }
     }
@@ -291,7 +289,8 @@ void Application::createGraphicsPipeline() {
     inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-    // Create a viewport. The extent of the viewport will always be the size of the images in the swapchain
+    // Create a viewport. The extent of the viewport will always
+    // be the size of the images in the swapchain
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -303,7 +302,7 @@ void Application::createGraphicsPipeline() {
     // Create a scissor. Any pixels outside the scissor region will be discarded
     VkRect2D scissor = {};
     scissor.extent = swapchainExtent;
-    scissor.offset = { 0, 0};
+    scissor.offset = {0, 0};
 
     VkPipelineViewportStateCreateInfo viewPortCreateInfo = {};
     viewPortCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -338,8 +337,8 @@ void Application::createGraphicsPipeline() {
 
     // Configure the color blending stage
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
     // Create color blending info
@@ -358,12 +357,13 @@ void Application::createGraphicsPipeline() {
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr,
-                               &graphicsPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr, &graphicsPipelineLayout) !=
+        VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline layout!");
     }
 
-    // Create the info for our graphics pipeline. We'll add a programmable vertex and fragment shader stage
+    // Create the info for our graphics pipeline. We'll add a
+    // programmable vertex and fragment shader stage
     VkGraphicsPipelineCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     createInfo.stageCount = 2;
@@ -381,8 +381,8 @@ void Application::createGraphicsPipeline() {
     createInfo.subpass = 0;
     createInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &createInfo, nullptr,
-                                  &graphicsPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &createInfo, nullptr, &graphicsPipeline) !=
+        VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline!");
     }
 
@@ -409,8 +409,7 @@ void Application::createImageViews() {
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(logicalDevice, &createInfo, nullptr,
-                              &swapchainImageViews[i]) != VK_SUCCESS) {
+        if (vkCreateImageView(logicalDevice, &createInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create image views!");
         }
     }
@@ -426,7 +425,7 @@ void Application::createInstance() {
     applicationInfo.pApplicationName = "Renderer";
     applicationInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     applicationInfo.pEngineName = "No Engine";
-    applicationInfo.engineVersion = VK_MAKE_VERSION(1, 0 , 0);
+    applicationInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     applicationInfo.apiVersion = VK_API_VERSION_1_2;
 
     // Grab the needed Vulkan extensions. This also initializes the list of required extensions
@@ -444,7 +443,7 @@ void Application::createInstance() {
         instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 
         PopulateDebugMessengerCreateInfo(debugCreateInfo);
-        debugCreateInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT*>(&debugCreateInfo);
+        debugCreateInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT *>(&debugCreateInfo);
     } else {
         instanceCreateInfo.enabledLayerCount = 0;
         debugCreateInfo.pNext = nullptr;
@@ -492,8 +491,8 @@ void Application::createLogicalDevice() {
         throw std::runtime_error("Unable to create logical device!");
     }
 
-    // Grab the device queue handles for the graphics and present queues after logical device creation
-    // queueIndex = 0 because we are only going to use one graphics queue per queue family
+    // Grab the device queue handles for the graphics and present queues after logical device
+    // creation queueIndex = 0 because we are only going to use one graphics queue per queue family
     vkGetDeviceQueue(logicalDevice, queueIndices.graphicsFamilyIndex, 0, &graphicsQueue);
     vkGetDeviceQueue(logicalDevice, queueIndices.presentFamilyIndex, 0, &presentQueue);
 }
@@ -547,7 +546,7 @@ VkShaderModule Application::createShaderModule(const std::vector<char> &shaderCo
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = shaderCode.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+    createInfo.pCode = reinterpret_cast<const uint32_t *>(shaderCode.data());
 
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
@@ -633,18 +632,17 @@ void Application::createSyncObjects() {
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Set this flag to be initialized to be on
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr,
-                              &imageAvailableSemaphores[i]) != VK_SUCCESS) {
+        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]) !=
+            VK_SUCCESS) {
             throw std::runtime_error("Unable to create semaphore!");
         }
 
-        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr,
-                              &renderFinishedSemaphores[i]) != VK_SUCCESS) {
+        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) !=
+            VK_SUCCESS) {
             throw std::runtime_error("Unable to create semaphore!");
         }
 
-        if (vkCreateFence(logicalDevice, &fenceCreateInfo, nullptr,
-                          &inFlightFences[i]) != VK_SUCCESS) {
+        if (vkCreateFence(logicalDevice, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create fence!");
         }
     }
@@ -710,19 +708,17 @@ void Application::createUICommandPool(VkCommandPool *cmdPool, VkCommandPoolCreat
 // Copied this code from DearImgui's setup:
 // https://github.com/ocornut/imgui/blob/master/examples/example_glfw_vulkan/main.cpp
 void Application::createUIDescriptorPool() {
-    VkDescriptorPoolSize pool_sizes[] = {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-    };
+    VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+                                         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+                                         {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+                                         {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
 
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -783,7 +779,7 @@ void Application::createUIRenderPass() {
     // so we need to configure a subpass dependency as such
     VkSubpassDependency subpassDependency = {};
     subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL; // Create external dependency
-    subpassDependency.dstSubpass = 0; // The geometry subpass comes first
+    subpassDependency.dstSubpass = 0;                   // The geometry subpass comes first
     subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     subpassDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Wait on writes
@@ -805,7 +801,8 @@ void Application::createUIRenderPass() {
 }
 
 void Application::drawFrame() {
-    // Sync for next frame. Fences also need to be manually reset unlike semaphores, which is done here
+    // Sync for next frame. Fences also need to be manually reset
+    // unlike semaphores, which is done here
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -871,7 +868,7 @@ void Application::drawFrame() {
         // Recreate the swap chain if the window size has changed
         framebufferResized = false;
         recreateSwapchain();
-    } else if (result != VK_SUCCESS ) {
+    } else if (result != VK_SUCCESS) {
         throw std::runtime_error("Unable to present the swap chain image!");
     }
 
@@ -897,7 +894,8 @@ void Application::drawUI() {
     ImGui::SameLine();
     ImGui::Text("counter = %d", counter);
 
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                ImGui::GetIO().Framerate);
     ImGui::End();
 
     ImGui::Render();
@@ -944,11 +942,11 @@ void Application::getDeviceQueueIndices() {
 
 std::vector<const char *> Application::getRequiredExtensions() const {
     uint32_t glfwExtensionCount = 0;
-    const char** glfwRequiredExtensions;
+    const char **glfwRequiredExtensions;
     glfwRequiredExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    std::vector<const char*> extensions(glfwRequiredExtensions, glfwRequiredExtensions + glfwExtensionCount);
-    for (const char* extension : extensions) {
+    std::vector<const char *> extensions(glfwRequiredExtensions, glfwRequiredExtensions + glfwExtensionCount);
+    for (const char *extension : extensions) {
         std::cout << extension << std::endl;
     }
 
@@ -1063,7 +1061,7 @@ VkPhysicalDevice Application::pickPhysicalDevice() {
         throw std::runtime_error("No physical devices are available that support Vulkan!");
     }
 
-    for (const auto& device : physicalDevices) {
+    for (const auto &device : physicalDevices) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(device, &properties);
 
@@ -1131,20 +1129,14 @@ Application::SwapchainConfiguration Application::querySwapchainSupport(const VkP
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
     if (formatCount > 0) {
         config.surfaceFormats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device,
-                                             surface,
-                                             &formatCount,
-                                             config.surfaceFormats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, config.surfaceFormats.data());
     }
 
     uint32_t presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
     if (presentModeCount > 0) {
         config.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device,
-                                                  surface,
-                                                  &presentModeCount,
-                                                  config.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, config.presentModes.data());
     }
 
     return config;
