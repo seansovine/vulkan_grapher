@@ -13,7 +13,7 @@
 // GLFW callbacks.
 
 void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
-    auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
+    auto app = static_cast<Application *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
 }
 
