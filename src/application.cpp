@@ -6,8 +6,91 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
 
+#include <iostream>
 #include <set>
 #include <string>
+
+// GLFW callbacks.
+
+void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
+    auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
+    app->framebufferResized = true;
+}
+
+void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+}
+
+// Static helpers.
+
+static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                             const VkAllocationCallbacks *pAllocator,
+                                             VkDebugUtilsMessengerEXT *pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+                                          const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                    VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                                    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                                    void *pUserData) {
+    std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+
+    return VK_FALSE;
+}
+
+static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
+}
+
+void Application::drawUI() {
+    // Start the Dear ImGui frame
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    static float f = 0.0f;
+    static int counter = 0;
+
+    ImGui::Begin("Renderer Options");
+    ImGui::Text("This is some useful text.");
+    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+    if (ImGui::Button("Button")) {
+        counter++;
+    }
+    ImGui::SameLine();
+    ImGui::Text("counter = %d", counter);
+
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                ImGui::GetIO().Framerate);
+    ImGui::End();
+
+    ImGui::Render();
+}
+
+// Class methods.
 
 Application::Application() {
     initWindow();
@@ -876,31 +959,6 @@ void Application::drawFrame() {
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Application::drawUI() {
-    // Start the Dear ImGui frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    static float f = 0.0f;
-    static int counter = 0;
-
-    ImGui::Begin("Renderer Options");
-    ImGui::Text("This is some useful text.");
-    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-    if (ImGui::Button("Button")) {
-        counter++;
-    }
-    ImGui::SameLine();
-    ImGui::Text("counter = %d", counter);
-
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                ImGui::GetIO().Framerate);
-    ImGui::End();
-
-    ImGui::Render();
-}
-
 void Application::endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool cmdPool) {
     vkEndCommandBuffer(commandBuffer);
 
@@ -1040,12 +1098,6 @@ bool Application::isDeviceSuitable(VkPhysicalDevice device) {
     }
 
     return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-}
-
-void Application::keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
 }
 
 VkPhysicalDevice Application::pickPhysicalDevice() {
