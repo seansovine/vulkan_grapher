@@ -1050,7 +1050,7 @@ void Application::initVulkan() {
     createInstance();
     setupDebugMessenger();
     createSurface();
-    physicalDevice = pickPhysicalDevice();
+    pickPhysicalDevice();
     getDeviceQueueIndices();
     createLogicalDevice();
     createSwapchain();
@@ -1100,7 +1100,7 @@ bool Application::isDeviceSuitable(VkPhysicalDevice device) {
     return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
-VkPhysicalDevice Application::pickPhysicalDevice() {
+void Application::pickPhysicalDevice() {
     uint32_t physicalDeviceCount = 0;
     if (vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("Unable to enumerate physical devices!");
@@ -1119,7 +1119,7 @@ VkPhysicalDevice Application::pickPhysicalDevice() {
 
         if (isDeviceSuitable(device)) {
             std::cout << "Using discrete GPU: " << properties.deviceName << std::endl;
-            return device;
+            physicalDevice = device;
         }
     }
 
@@ -1132,7 +1132,7 @@ VkPhysicalDevice Application::pickPhysicalDevice() {
     }
 
     std::cout << "Using fallback physical device: " << properties.deviceName << std::endl;
-    return physicalDevices[0];
+    physicalDevice = physicalDevices[0];
 }
 
 VkExtent2D Application::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities) {

@@ -106,7 +106,7 @@ private:
 
     bool isDeviceSuitable(VkPhysicalDevice device);
 
-    VkPhysicalDevice pickPhysicalDevice();
+    void pickPhysicalDevice();
 
     VkExtent2D pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);
 
@@ -172,7 +172,7 @@ private:
         "VK_LAYER_KHRONOS_validation",
     };
 
-    // Debug utilities
+    // Debug utilities.
 
     VkDebugUtilsMessengerEXT debugMessenger;
 #ifdef NDEBUG
