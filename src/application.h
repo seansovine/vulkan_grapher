@@ -2,7 +2,6 @@
 
 #include "vertex.h"
 
-#include <array>
 #include <cstring>
 #include <vector>
 
@@ -57,10 +56,6 @@ private:
     VkCommandBuffer beginSingleTimeCommands(VkCommandPool cmdPool);
 
     void endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool cmdPool);
-
-    bool checkDeviceExtensions(VkPhysicalDevice device);
-
-    bool checkValidationLayerSupport();
 
     void cleanupSwapchain();
 
@@ -177,10 +172,10 @@ private:
     VkDescriptorPool uiDescriptorPool;
 
     std::vector<const char *> requiredExtensions;
-    const std::array<const char *, 1> deviceExtensions = {
+    const std::vector<const char *> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME //
     };
-    const std::array<const char *, 1> validationLayers = {
+    const std::vector<const char *> validationLayers = {
         "VK_LAYER_KHRONOS_validation",
     };
 

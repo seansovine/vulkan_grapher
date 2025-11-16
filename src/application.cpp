@@ -2,6 +2,7 @@
 
 #include "shaderloader.h"
 #include "vertex.h"
+#include "vulkan_helper.h"
 
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
@@ -64,31 +65,6 @@ static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT 
                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = debugCallback;
-}
-
-void Application::drawUI() {
-    // Start the Dear ImGui frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    static float f = 0.0f;
-    static int counter = 0;
-
-    ImGui::Begin("Renderer Options");
-    ImGui::Text("This is some useful text.");
-    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-    if (ImGui::Button("Button")) {
-        counter++;
-    }
-    ImGui::SameLine();
-    ImGui::Text("counter = %d", counter);
-
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                ImGui::GetIO().Framerate);
-    ImGui::End();
-
-    ImGui::Render();
 }
 
 // Class methods.
@@ -156,6 +132,8 @@ Application::~Application() {
     glfwDestroyWindow(window);
     glfwTerminate();
 }
+
+// Initialization methods.
 
 void Application::initUI() {
     IMGUI_CHECKVERSION();
@@ -226,6 +204,151 @@ void Application::initWindow() {
     }
 }
 
+// If swapchain is invalidated, like during window resize, recreate it.
+void Application::recreateSwapchain() {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        // Idle wait in case our application has been minimized
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(logicalDevice);
+
+    cleanupSwapchain();
+    cleanupUIResources();
+
+    // Recreate main application Vulkan resources
+    createSwapchain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+    createDescriptorPool();
+    createCommandBuffers();
+
+    // We also need to take care of the UI
+    ImGui_ImplVulkan_SetMinImageCount(imageCount);
+    createUICommandBuffers();
+    createUIFramebuffers();
+}
+
+// Render loop methods.
+
+void Application::run() {
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        drawUI();
+        drawFrame();
+    }
+
+    // Wait for unfinished work on GPU before ending application
+    vkDeviceWaitIdle(logicalDevice);
+}
+
+void Application::drawUI() {
+    // Start the Dear ImGui frame
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    static float f = 0.0f;
+    static int counter = 0;
+
+    ImGui::Begin("Renderer Options");
+    ImGui::Text("This is some useful text.");
+    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+    if (ImGui::Button("Button")) {
+        counter++;
+    }
+    ImGui::SameLine();
+    ImGui::Text("counter = %d", counter);
+
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                ImGui::GetIO().Framerate);
+    ImGui::End();
+
+    ImGui::Render();
+}
+
+void Application::drawFrame() {
+    // Sync for next frame. Fences also need to be manually reset
+    // unlike semaphores, which is done here
+    vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(logicalDevice, swapchain, UINT64_MAX,
+                                            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    // If the window has been resized or another event causes the swap chain to become invalid,
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapchain();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Unable to acquire swap chain!");
+    }
+
+    // Check if a previous frame is using this image (i.e. there is its fence to wait on)
+    if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+        vkWaitForFences(logicalDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+    }
+
+    // Mark the image as now being in use by this frame
+    imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+
+    // Record UI draw data
+    recordUICommands(imageIndex);
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiCommandBuffers[imageIndex]};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
+    submitInfo.pCommandBuffers = cmdBuffers.data();
+
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    // Reset the in-flight fences so we do not get blocked waiting on in-flight images
+    vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
+
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapchains[] = {swapchain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapchains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    // Submit the present queue
+    result = vkQueuePresentKHR(presentQueue, &presentInfo);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+        // Recreate the swap chain if the window size has changed
+        framebufferResized = false;
+        recreateSwapchain();
+    } else if (result != VK_SUCCESS) {
+        throw std::runtime_error("Unable to present the swap chain image!");
+    }
+
+    // Advance the current frame to get the semaphore data for the next frame
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+// Vulkan and ImGui helpers.
+
 VkCommandBuffer Application::beginSingleTimeCommands(VkCommandPool cmdPool) {
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -245,46 +368,6 @@ VkCommandBuffer Application::beginSingleTimeCommands(VkCommandPool cmdPool) {
     }
 
     return commandBuffer;
-}
-
-bool Application::checkDeviceExtensions(VkPhysicalDevice device) {
-    uint32_t extensionsCount = 0;
-    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, nullptr) != VK_SUCCESS) {
-        throw std::runtime_error("Unable to enumerate device extensions!");
-    }
-
-    std::vector<VkExtensionProperties> availableExtensions(extensionsCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, availableExtensions.data());
-
-    std::set<std::string> requiredDeviceExtensions(deviceExtensions.begin(), deviceExtensions.end());
-    for (const auto &extension : availableExtensions) {
-        requiredDeviceExtensions.erase(extension.extensionName);
-    }
-
-    return requiredDeviceExtensions.empty();
-}
-
-bool Application::checkValidationLayerSupport() {
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-    for (const char *layerName : validationLayers) {
-        bool layerFound = false;
-        for (const auto &layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound) {
-            return false;
-        }
-    }
-    return true;
 }
 
 // Destroys all the resources associated with swapchain recreation
@@ -624,7 +707,7 @@ void Application::createImageViews() {
 }
 
 void Application::createInstance() {
-    if (enableValidationLayers && !checkValidationLayerSupport()) {
+    if (enableValidationLayers && !VulkanHelper::checkValidationLayerSupport(validationLayers)) {
         throw std::runtime_error("Unable to establish validation layer support!");
     }
 
@@ -935,6 +1018,7 @@ void Application::createUIDescriptorPool() {
     pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
     pool_info.poolSizeCount = static_cast<uint32_t>(IM_ARRAYSIZE(pool_sizes));
     pool_info.pPoolSizes = pool_sizes;
+
     if (vkCreateDescriptorPool(logicalDevice, &pool_info, nullptr, &uiDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Cannot allocate UI descriptor pool!");
     }
@@ -944,6 +1028,7 @@ void Application::createUIFramebuffers() {
     // Create some UI framebuffers. These will be used in the render pass for the UI
     uiFramebuffers.resize(swapchainImages.size());
     VkImageView attachment[1];
+
     VkFramebufferCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     info.renderPass = uiRenderPass;
@@ -952,6 +1037,7 @@ void Application::createUIFramebuffers() {
     info.width = swapchainExtent.width;
     info.height = swapchainExtent.height;
     info.layers = 1;
+
     for (uint32_t i = 0; i < swapchainImages.size(); ++i) {
         attachment[0] = swapchainImageViews[i];
         if (vkCreateFramebuffer(logicalDevice, &info, nullptr, &uiFramebuffers[i]) != VK_SUCCESS) {
@@ -1007,82 +1093,6 @@ void Application::createUIRenderPass() {
     if (vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &uiRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create UI render pass!");
     }
-}
-
-void Application::drawFrame() {
-    // Sync for next frame. Fences also need to be manually reset
-    // unlike semaphores, which is done here
-    vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(logicalDevice, swapchain, UINT64_MAX,
-                                            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-    // If the window has been resized or another event causes the swap chain to become invalid,
-    // we need to recreate it
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain();
-        return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        throw std::runtime_error("Unable to acquire swap chain!");
-    }
-
-    // Check if a previous frame is using this image (i.e. there is its fence to wait on)
-    if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-        vkWaitForFences(logicalDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
-    }
-
-    // Mark the image as now being in use by this frame
-    imagesInFlight[imageIndex] = inFlightFences[currentFrame];
-
-    // Record UI draw data
-    recordUICommands(imageIndex);
-
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiCommandBuffers[imageIndex]};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
-    submitInfo.pCommandBuffers = cmdBuffers.data();
-
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    // Reset the in-flight fences so we do not get blocked waiting on in-flight images
-    vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
-
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
-
-    VkPresentInfoKHR presentInfo = {};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapchains[] = {swapchain};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapchains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    // Submit the present queue
-    result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-        // Recreate the swap chain if the window size has changed
-        framebufferResized = false;
-        recreateSwapchain();
-    } else if (result != VK_SUCCESS) {
-        throw std::runtime_error("Unable to present the swap chain image!");
-    }
-
-    // Advance the current frame to get the semaphore data for the next frame
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Application::endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool cmdPool) {
@@ -1143,7 +1153,7 @@ std::vector<const char *> Application::getRequiredExtensions() const {
 bool Application::isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(device, &properties);
-    bool extensionsSupported = checkDeviceExtensions(device);
+    bool extensionsSupported = VulkanHelper::checkDeviceExtensions(device, deviceExtensions);
 
     // Check if Swap Chain support is adequate
     bool swapChainAdequate = false;
@@ -1247,48 +1257,6 @@ Application::SwapchainConfiguration Application::querySwapchainSupport(const VkP
     }
 
     return config;
-}
-
-// In case the swapchain is invalidated, i.e. during window resizing,
-// we need to implement a mechanism to recreate it
-void Application::recreateSwapchain() {
-    int width = 0, height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
-    while (width == 0 || height == 0) {
-        // Idle wait in case our application has been minimized
-        glfwGetFramebufferSize(window, &width, &height);
-        glfwWaitEvents();
-    }
-
-    vkDeviceWaitIdle(logicalDevice);
-
-    cleanupSwapchain();
-    cleanupUIResources();
-
-    // Recreate main application Vulkan resources
-    createSwapchain();
-    createImageViews();
-    createRenderPass();
-    createGraphicsPipeline();
-    createFramebuffers();
-    createDescriptorPool();
-    createCommandBuffers();
-
-    // We also need to take care of the UI
-    ImGui_ImplVulkan_SetMinImageCount(imageCount);
-    createUICommandBuffers();
-    createUIFramebuffers();
-}
-
-void Application::run() {
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-        drawUI();
-        drawFrame();
-    }
-
-    // Wait for unfinished work on GPU before ending application
-    vkDeviceWaitIdle(logicalDevice);
 }
 
 void Application::setupDebugMessenger() {
