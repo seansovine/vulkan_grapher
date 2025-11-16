@@ -1,10 +1,11 @@
 #include "application.h"
 
 #include "shaderloader.h"
+#include "vertex.h"
 
-#include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
+#include <imgui/imgui.h>
 
 #include <iostream>
 #include <set>
@@ -92,7 +93,8 @@ void Application::drawUI() {
 
 // Class methods.
 
-Application::Application() {
+Application::Application()
+    : vertexData{TEST_VERTICES_1} {
     initWindow();
     initVulkan();
     initUI();
@@ -114,6 +116,9 @@ Application::~Application() {
                          uiCommandBuffers.data());
     vkDestroyCommandPool(logicalDevice, uiCommandPool, nullptr);
     vkDestroyRenderPass(logicalDevice, uiRenderPass, nullptr);
+
+    vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
+    vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
 
     for (auto framebuffer : uiFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
@@ -150,6 +155,75 @@ Application::~Application() {
     // Cleanup GLFW
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void Application::initUI() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    // Initialize some DearImgui specific resources
+    createUIDescriptorPool();
+    createUIRenderPass();
+    createUICommandPool(&uiCommandPool, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    createUICommandBuffers();
+    createUIFramebuffers();
+
+    // Provide bind points from Vulkan API
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = instance;
+    init_info.PhysicalDevice = physicalDevice;
+    init_info.Device = logicalDevice;
+    init_info.QueueFamily = queueIndices.graphicsFamilyIndex;
+    init_info.Queue = graphicsQueue;
+    init_info.DescriptorPool = uiDescriptorPool;
+    init_info.MinImageCount = imageCount;
+    init_info.ImageCount = imageCount;
+    init_info.PipelineInfoMain.RenderPass = uiRenderPass;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    ImGui_ImplVulkan_Init(&init_info);
+}
+
+void Application::initVulkan() {
+    createInstance();
+    setupDebugMessenger();
+    createSurface();
+    pickPhysicalDevice();
+    getDeviceQueueIndices();
+    createLogicalDevice();
+    createSwapchain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+    createCommandPool();
+    createVertexBuffer();
+    createCommandBuffers();
+    createSyncObjects();
+    createDescriptorPool();
+}
+
+void Application::initWindow() {
+    if (!glfwInit()) {
+        throw std::runtime_error("Unable to initialize GLFW!");
+    }
+
+    // Do not load OpenGL and make window not resizable
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
+    glfwSetKeyCallback(window, keyCallback);
+
+    // Add a pointer that allows GLFW to reference our instance
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+
+    if (!window) {
+        glfwTerminate();
+        throw std::runtime_error("Unable to create window!");
+    }
 }
 
 VkCommandBuffer Application::beginSingleTimeCommands(VkCommandPool cmdPool) {
@@ -278,7 +352,10 @@ void Application::createCommandBuffers() {
         // Begin recording commands into the command buffer
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-        vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+        VkBuffer vertexBuffers[] = {vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+        vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertexData.size()), 1, 0, 0);
         vkCmdEndRenderPass(commandBuffers[i]);
 
         if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -295,6 +372,51 @@ void Application::createCommandPool() {
     if (vkCreateCommandPool(logicalDevice, &createInfo, nullptr, &commandPool) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create command pool!");
     }
+}
+
+uint32_t Application::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void Application::createVertexBuffer() {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create vertex buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(
+        memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate vertex buffer memory!");
+    }
+
+    vkBindBufferMemory(logicalDevice, vertexBuffer, vertexBufferMemory, 0);
+
+    void *data;
+    vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, vertexData.data(), (size_t)bufferInfo.size);
+    vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
 void Application::createDescriptorPool() {
@@ -357,13 +479,16 @@ void Application::createGraphicsPipeline() {
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
     // Create information struct for vertex input
-    // TODO: Adjust this so that we actually take input from a vertex buffer
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     // Create information struct about input assembly
     // We'll be organizing our vertices in triangles and the GPU should treat the data accordingly
@@ -1013,74 +1138,6 @@ std::vector<const char *> Application::getRequiredExtensions() const {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
     return extensions;
-}
-
-void Application::initUI() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    // Initialize some DearImgui specific resources
-    createUIDescriptorPool();
-    createUIRenderPass();
-    createUICommandPool(&uiCommandPool, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    createUICommandBuffers();
-    createUIFramebuffers();
-
-    // Provide bind points from Vulkan API
-    ImGui_ImplGlfw_InitForVulkan(window, true);
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = instance;
-    init_info.PhysicalDevice = physicalDevice;
-    init_info.Device = logicalDevice;
-    init_info.QueueFamily = queueIndices.graphicsFamilyIndex;
-    init_info.Queue = graphicsQueue;
-    init_info.DescriptorPool = uiDescriptorPool;
-    init_info.MinImageCount = imageCount;
-    init_info.ImageCount = imageCount;
-    init_info.PipelineInfoMain.RenderPass = uiRenderPass;
-    init_info.PipelineInfoMain.Subpass = 0;
-    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    ImGui_ImplVulkan_Init(&init_info);
-}
-
-void Application::initVulkan() {
-    createInstance();
-    setupDebugMessenger();
-    createSurface();
-    pickPhysicalDevice();
-    getDeviceQueueIndices();
-    createLogicalDevice();
-    createSwapchain();
-    createImageViews();
-    createRenderPass();
-    createGraphicsPipeline();
-    createFramebuffers();
-    createCommandPool();
-    createCommandBuffers();
-    createSyncObjects();
-    createDescriptorPool();
-}
-
-void Application::initWindow() {
-    if (!glfwInit()) {
-        throw std::runtime_error("Unable to initialize GLFW!");
-    }
-
-    // Do not load OpenGL and make window not resizable
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
-    glfwSetKeyCallback(window, keyCallback);
-
-    // Add a pointer that allows GLFW to reference our instance
-    glfwSetWindowUserPointer(window, this);
-    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-
-    if (!window) {
-        glfwTerminate();
-        throw std::runtime_error("Unable to create window!");
-    }
 }
 
 bool Application::isDeviceSuitable(VkPhysicalDevice device) {

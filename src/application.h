@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vertex.h"
+
 #include <array>
 #include <cstring>
 #include <vector>
@@ -67,6 +69,10 @@ private:
     void createCommandBuffers();
 
     void createCommandPool();
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    void createVertexBuffer();
 
     void createDescriptorPool();
 
@@ -154,6 +160,10 @@ private:
     VkCommandPool uiCommandPool;
     std::vector<VkCommandBuffer> commandBuffers;
     std::vector<VkCommandBuffer> uiCommandBuffers;
+
+    std::vector<Vertex> vertexData;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
 
     uint32_t imageCount = 0;
     uint32_t currentFrame = 0;
