@@ -1,8 +1,23 @@
 add_subdirectory(imgui)
 
-SET(SRCS main.cpp application.h application.cpp shaderloader.h)
+SET(HEADERS
+	application.h
+	shaderloader.h
+	imgui_vulkan_data.h
+	vertex.h
+	vulkan_debug.h
+	vulkan_helper.h
+	vulkan_wrapper.h
+)
 
-add_executable(renderer-app ${SRCS})
+SET(SRCS
+	main.cpp
+	application.cpp
+	imgui_vulkan_data.cpp
+	vulkan_wrapper.cpp
+)
+
+add_executable(renderer-app ${HEADERS} ${SRCS})
 target_include_directories(renderer-app PUBLIC imgui)
 target_link_libraries(renderer-app
 	glfw

@@ -1,8 +1,7 @@
 #ifndef VULKAN_HELPER_H_
 #define VULKAN_HELPER_H_
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 
 #include <cstdint>
 #include <cstring>

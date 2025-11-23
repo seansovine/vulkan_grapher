@@ -46,15 +46,15 @@ enum class TestVertexSet {
 
 // clang-format off
 static const std::vector<Vertex> TEST_VERTICES_1 = {
-    {{ 0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}}, //
-    {{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},  //
-    {{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
+    Vertex{{ 0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}}, //
+    Vertex{{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, //
+    Vertex{{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
 };
 
 static const std::vector<Vertex> TEST_VERTICES_2 = {
-    {{ 0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}}, //
-    {{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},  //
-    {{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
+    Vertex{{ 0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}}, //
+    Vertex{{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, //
+    Vertex{{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
 };
 // clang-format on
 
