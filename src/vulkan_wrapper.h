@@ -17,6 +17,8 @@
 // in the larger application. As the name suggests, this version is for
 // integration with resources provided by the GLFW framework.
 
+// Data structs.
+
 struct SwapChainInfo {
     VkSwapchainKHR swapchain;
     std::vector<VkImage> swapchainImages;
@@ -26,22 +28,21 @@ struct SwapChainInfo {
     std::vector<VkFramebuffer> swapchainFramebuffers;
 };
 
-class GlfwVulkanWrapper {
-public:
-    struct QueueFamilyIndices {
-        uint32_t graphicsFamilyIndex;
-        uint32_t computeFamilyIndex;
-        uint32_t presentFamilyIndex;
-    };
+struct QueueFamilyIndices {
+    uint32_t graphicsFamilyIndex;
+    uint32_t computeFamilyIndex;
+    uint32_t presentFamilyIndex;
+};
 
-private:
-    struct SwapchainConfiguration {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> surfaceFormats;
-        std::vector<VkPresentModeKHR> presentModes;
-    };
+struct SwapchainConfiguration {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> surfaceFormats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
 
-private:
+// Main interface class.
+
+class GlfwImGuiVulkanWrapper {
     // Extension information.
     std::vector<const char *> requiredExtensions;
     const std::vector<const char *> deviceExtensions = {
@@ -51,8 +52,9 @@ private:
         "VK_LAYER_KHRONOS_validation",
     };
 
-    // Debug utilities.
+    // Debug information.
     VkDebugUtilsMessengerEXT debugMessenger;
+
 #ifdef NDEBUG
     const bool enableValidationLayers = false;
 #else
@@ -60,6 +62,7 @@ private:
 #endif
 
 private:
+    // Main Vulkan entities.
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkDevice logicalDevice;
@@ -98,11 +101,13 @@ public:
     uint32_t vertexDataSize;
 
 public:
+    // State management functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const std::vector<Vertex> &vertexData);
     void recreateSwapchain(GLFWwindow *window);
     void waitForDeviceIdle();
     void deinit(ImGuiVulkanData uiVulkanData);
 
+    // Rendering functions.
     void drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanData, bool frameBufferResized);
     void updateMesh(const std::vector<Vertex> &vertexData);
 

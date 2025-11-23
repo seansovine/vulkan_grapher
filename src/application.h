@@ -51,7 +51,7 @@ private:
     bool framebufferResized = false;
 
     GLFWwindow *window;
-    GlfwVulkanWrapper vulkan;
+    GlfwImGuiVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
 
     TestVertexSet currentTestVertexSet;

@@ -111,7 +111,7 @@ void Application::run() {
         drawFrame();
     }
 
-    // Wait for unfinished work on GPU before ending application
+    // Wait for unfinished work on GPU before ending application.
     vulkan.waitForDeviceIdle();
 }
 

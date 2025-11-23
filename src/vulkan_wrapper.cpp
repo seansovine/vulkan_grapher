@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <iostream>
 
-void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             const std::vector<Vertex> &vertexData) {
+// State management functions.
+
+void GlfwImGuiVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
+                                  const std::vector<Vertex> &vertexData) {
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
 
@@ -39,7 +41,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_
 }
 
 // If swapchain is invalidated, like during window resize, recreate it.
-void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
+void GlfwImGuiVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
     while (width == 0 || height == 0) {
@@ -62,12 +64,12 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     createCommandBuffers();
 }
 
-void GlfwVulkanWrapper::waitForDeviceIdle() {
+void GlfwImGuiVulkanWrapper::waitForDeviceIdle() {
     // Wait for unfinished work on GPU to complete.
     vkDeviceWaitIdle(logicalDevice);
 }
 
-void GlfwVulkanWrapper::deinit(ImGuiVulkanData uiVulkanData) {
+void GlfwImGuiVulkanWrapper::deinit(ImGuiVulkanData uiVulkanData) {
     if (enableValidationLayers) {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
@@ -115,7 +117,9 @@ void GlfwVulkanWrapper::deinit(ImGuiVulkanData uiVulkanData) {
     vkDestroyInstance(instance, nullptr);
 }
 
-void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanData, bool frameBufferResized) {
+// Rendering functions.
+
+void GlfwImGuiVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanData, bool frameBufferResized) {
     // Sync for next frame. Fences also need to be manually reset
     // unlike semaphores, which is done below.
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -192,7 +196,7 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanDa
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
+void GlfwImGuiVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
     // This is currently for updating the data; not chaning the count.
     size_t dataSizeBytes = sizeof(vertexData[0]) * vertexData.size();
     assert(vertexData.size() == vertexDataSize);
@@ -204,7 +208,9 @@ void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
     vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
-ImGui_ImplVulkan_InitInfo GlfwVulkanWrapper::imGuiInitInfo(ImGuiVulkanData uiVulkanData) {
+// Misc. helpers used by initialization.
+
+ImGui_ImplVulkan_InitInfo GlfwImGuiVulkanWrapper::imGuiInitInfo(ImGuiVulkanData uiVulkanData) {
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = instance;
     init_info.PhysicalDevice = physicalDevice;
@@ -220,9 +226,7 @@ ImGui_ImplVulkan_InitInfo GlfwVulkanWrapper::imGuiInitInfo(ImGuiVulkanData uiVul
     return init_info;
 }
 
-// Misc. helpers used by initialization.
-
-std::vector<const char *> GlfwVulkanWrapper::getRequiredExtensions() const {
+std::vector<const char *> GlfwImGuiVulkanWrapper::getRequiredExtensions() const {
     uint32_t glfwExtensionCount = 0;
     const char **glfwRequiredExtensions;
     glfwRequiredExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -238,7 +242,7 @@ std::vector<const char *> GlfwVulkanWrapper::getRequiredExtensions() const {
     return extensions;
 }
 
-bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
+bool GlfwImGuiVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(device, &properties);
     bool extensionsSupported = VulkanHelper::checkDeviceExtensions(device, deviceExtensions);
@@ -253,7 +257,7 @@ bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
     return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
-GlfwVulkanWrapper::SwapchainConfiguration GlfwVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
+SwapchainConfiguration GlfwImGuiVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
     SwapchainConfiguration config = {};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &config.capabilities);
 
@@ -274,7 +278,7 @@ GlfwVulkanWrapper::SwapchainConfiguration GlfwVulkanWrapper::querySwapchainSuppo
     return config;
 }
 
-VkShaderModule GlfwVulkanWrapper::createShaderModule(const std::vector<char> &shaderCode) {
+VkShaderModule GlfwImGuiVulkanWrapper::createShaderModule(const std::vector<char> &shaderCode) {
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = shaderCode.size();
@@ -288,7 +292,7 @@ VkShaderModule GlfwVulkanWrapper::createShaderModule(const std::vector<char> &sh
     return shaderModule;
 }
 
-uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t GlfwImGuiVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
@@ -303,7 +307,7 @@ uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryProperty
 
 // Swap chain creation helpers.
 
-VkExtent2D GlfwVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities) {
+VkExtent2D GlfwImGuiVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities) {
     if (surfaceCapabilities.currentExtent.width != UINT32_MAX) {
         return surfaceCapabilities.currentExtent;
     } else {
@@ -316,7 +320,7 @@ VkExtent2D GlfwVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR
     }
 }
 
-VkPresentModeKHR GlfwVulkanWrapper::pickSwapchainPresentMode(const std::vector<VkPresentModeKHR> &presentModes) {
+VkPresentModeKHR GlfwImGuiVulkanWrapper::pickSwapchainPresentMode(const std::vector<VkPresentModeKHR> &presentModes) {
     // Look for triple-buffering present mode if available
     for (VkPresentModeKHR availableMode : presentModes) {
         if (availableMode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -328,7 +332,7 @@ VkPresentModeKHR GlfwVulkanWrapper::pickSwapchainPresentMode(const std::vector<V
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkSurfaceFormatKHR GlfwVulkanWrapper::pickSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
+VkSurfaceFormatKHR GlfwImGuiVulkanWrapper::pickSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
     for (VkSurfaceFormatKHR availableFormat : formats) {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR) {
@@ -343,7 +347,7 @@ VkSurfaceFormatKHR GlfwVulkanWrapper::pickSwapchainSurfaceFormat(const std::vect
 
 // Methods for Vulkan setup sequence.
 
-void GlfwVulkanWrapper::createInstance() {
+void GlfwImGuiVulkanWrapper::createInstance() {
     if (enableValidationLayers && !VulkanHelper::checkValidationLayerSupport(validationLayers)) {
         throw std::runtime_error("Unable to establish validation layer support!");
     }
@@ -383,7 +387,7 @@ void GlfwVulkanWrapper::createInstance() {
     }
 }
 
-void GlfwVulkanWrapper::setupDebugMessenger() {
+void GlfwImGuiVulkanWrapper::setupDebugMessenger() {
     if (!enableValidationLayers) {
         return;
     }
@@ -397,13 +401,13 @@ void GlfwVulkanWrapper::setupDebugMessenger() {
 }
 
 // For cross-platform compatibility we let GLFW take care of the surface creation
-void GlfwVulkanWrapper::createSurface(GLFWwindow *window) {
+void GlfwImGuiVulkanWrapper::createSurface(GLFWwindow *window) {
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create window surface!");
     }
 }
 
-void GlfwVulkanWrapper::pickPhysicalDevice() {
+void GlfwImGuiVulkanWrapper::pickPhysicalDevice() {
     uint32_t physicalDeviceCount = 0;
     if (vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("Unable to enumerate physical devices!");
@@ -438,7 +442,7 @@ void GlfwVulkanWrapper::pickPhysicalDevice() {
     physicalDevice = physicalDevices[0];
 }
 
-void GlfwVulkanWrapper::getDeviceQueueIndices() {
+void GlfwImGuiVulkanWrapper::getDeviceQueueIndices() {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
@@ -463,7 +467,7 @@ void GlfwVulkanWrapper::getDeviceQueueIndices() {
     }
 }
 
-void GlfwVulkanWrapper::createLogicalDevice() {
+void GlfwImGuiVulkanWrapper::createLogicalDevice() {
     std::set<uint32_t> uniqueQueueIndices = {queueIndices.graphicsFamilyIndex, queueIndices.presentFamilyIndex};
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float priority = 1.0f;
@@ -506,7 +510,7 @@ void GlfwVulkanWrapper::createLogicalDevice() {
 
 // Setup methods that use the logical device.
 
-void GlfwVulkanWrapper::createSwapchain() {
+void GlfwImGuiVulkanWrapper::createSwapchain() {
     SwapchainConfiguration configuration = querySwapchainSupport(physicalDevice);
 
     VkSurfaceFormatKHR surfaceFormat = pickSwapchainSurfaceFormat(configuration.surfaceFormats);
@@ -561,7 +565,7 @@ void GlfwVulkanWrapper::createSwapchain() {
                             swapChainInfo.swapchainImages.data());
 }
 
-void GlfwVulkanWrapper::createImageViews() {
+void GlfwImGuiVulkanWrapper::createImageViews() {
     swapChainInfo.swapchainImageViews.resize(swapChainInfo.swapchainImages.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImages.size(); ++i) {
         VkImageViewCreateInfo createInfo = {};
@@ -586,7 +590,7 @@ void GlfwVulkanWrapper::createImageViews() {
     }
 }
 
-void GlfwVulkanWrapper::createRenderPass() {
+void GlfwImGuiVulkanWrapper::createRenderPass() {
     // Configure a color attachment that will determine how the framebuffer is used
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapChainInfo.swapchainImageFormat;
@@ -631,7 +635,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwVulkanWrapper::createGraphicsPipeline() {
+void GlfwImGuiVulkanWrapper::createGraphicsPipeline() {
     // Load our shader modules in from disk
     auto vertShaderCode = ShaderLoader::load("shaders/vert.spv");
     auto fragShaderCode = ShaderLoader::load("shaders/frag.spv");
@@ -774,7 +778,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
 }
 
-void GlfwVulkanWrapper::createFramebuffers() {
+void GlfwImGuiVulkanWrapper::createFramebuffers() {
     swapChainInfo.swapchainFramebuffers.resize(swapChainInfo.swapchainImageViews.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImageViews.size(); ++i) {
         // We need to attach an image view to the frame buffer for presentation purposes
@@ -796,7 +800,7 @@ void GlfwVulkanWrapper::createFramebuffers() {
     }
 }
 
-void GlfwVulkanWrapper::createCommandPool() {
+void GlfwImGuiVulkanWrapper::createCommandPool() {
     VkCommandPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     createInfo.queueFamilyIndex = queueIndices.graphicsFamilyIndex;
@@ -806,7 +810,7 @@ void GlfwVulkanWrapper::createCommandPool() {
     }
 }
 
-void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
+void GlfwImGuiVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
@@ -838,7 +842,7 @@ void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData
     vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
-void GlfwVulkanWrapper::createCommandBuffers() {
+void GlfwImGuiVulkanWrapper::createCommandBuffers() {
     commandBuffers.resize(swapChainInfo.swapchainFramebuffers.size());
 
     VkCommandBufferAllocateInfo allocInfo = {};
@@ -886,7 +890,7 @@ void GlfwVulkanWrapper::createCommandBuffers() {
     }
 }
 
-void GlfwVulkanWrapper::createSyncObjects() {
+void GlfwImGuiVulkanWrapper::createSyncObjects() {
     // Create our semaphores and fences for synchronizing the GPU and CPU
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -917,7 +921,7 @@ void GlfwVulkanWrapper::createSyncObjects() {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorPool() {
+void GlfwImGuiVulkanWrapper::createDescriptorPool() {
     VkDescriptorPoolSize poolSize = {};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(swapChainInfo.swapchainImages.size());
@@ -935,7 +939,7 @@ void GlfwVulkanWrapper::createDescriptorPool() {
 
 // Cleanup methods.
 
-void GlfwVulkanWrapper::cleanupSwapchain() {
+void GlfwImGuiVulkanWrapper::cleanupSwapchain() {
     for (auto &swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, swapchainFramebuffer, nullptr);
     }
