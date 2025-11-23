@@ -39,6 +39,11 @@ struct Vertex {
     }
 };
 
+enum class TestVertexSet {
+    TEST_VERTICES_1,
+    TEST_VERTICES_2,
+};
+
 // clang-format off
 static const std::vector<Vertex> TEST_VERTICES_1 = {
     {{ 0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}}, //

@@ -4,6 +4,7 @@
 #include "vertex.h"
 #include "vulkan_helper.h"
 
+#include <cstddef>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
@@ -70,7 +71,8 @@ static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT 
 // Class methods.
 
 Application::Application()
-    : vertexData{TEST_VERTICES_1} {
+    : currentTestVertexSet(TestVertexSet::TEST_VERTICES_1),
+      vertexData{TEST_VERTICES_1} {
     initWindow();
     initVulkan();
     initUI();
@@ -257,13 +259,10 @@ void Application::drawUI() {
     static int counter = 0;
 
     ImGui::Begin("Renderer Options");
-    ImGui::Text("This is some useful text.");
-    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-    if (ImGui::Button("Button")) {
+    if (ImGui::Button("Toggle Vertex Colors")) {
         counter++;
+        updateMesh();
     }
-    ImGui::SameLine();
-    ImGui::Text("counter = %d", counter);
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
@@ -272,9 +271,26 @@ void Application::drawUI() {
     ImGui::Render();
 }
 
+void Application::updateMesh() {
+    if (currentTestVertexSet == TestVertexSet::TEST_VERTICES_1) {
+        currentTestVertexSet = TestVertexSet::TEST_VERTICES_2;
+        vertexData = TEST_VERTICES_2;
+    } else {
+        currentTestVertexSet = TestVertexSet::TEST_VERTICES_1;
+        vertexData = TEST_VERTICES_1;
+    }
+    size_t dataSize = sizeof(vertexData[0]) * vertexData.size();
+
+    void *data;
+    vkMapMemory(logicalDevice, vertexBufferMemory, 0, dataSize, 0, &data);
+    // Our buffer was created with the HOST_COHERENT bit, so we can update it here.
+    memcpy(data, vertexData.data(), dataSize);
+    vkUnmapMemory(logicalDevice, vertexBufferMemory);
+}
+
 void Application::drawFrame() {
     // Sync for next frame. Fences also need to be manually reset
-    // unlike semaphores, which is done here
+    // unlike semaphores, which is done below.
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -306,6 +322,7 @@ void Application::drawFrame() {
     VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiCommandBuffers[imageIndex]};
+
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
@@ -313,6 +330,7 @@ void Application::drawFrame() {
     submitInfo.pCommandBuffers = cmdBuffers.data();
 
     VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 

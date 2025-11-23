@@ -43,7 +43,12 @@ private:
 
     void drawFrame();
 
-    static void drawUI();
+    // This is currently toggles between the two example vertex sets
+    // updatess the vertex buffer with the new set that is chosen after
+    // toggling.
+    void updateMesh();
+
+    void drawUI();
 
     void recordUICommands(uint32_t bufferIdx);
 
@@ -156,6 +161,7 @@ private:
     std::vector<VkCommandBuffer> commandBuffers;
     std::vector<VkCommandBuffer> uiCommandBuffers;
 
+    TestVertexSet currentTestVertexSet;
     std::vector<Vertex> vertexData;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
