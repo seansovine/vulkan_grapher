@@ -4,6 +4,7 @@ SET(HEADERS
 	application.h
 	shaderloader.h
 	imgui_vulkan_data.h
+	uniforms.h
 	vertex.h
 	vulkan_debug.h
 	vulkan_helper.h

@@ -233,8 +233,8 @@ void Application::createUIFramebuffers() {
     info.renderPass = imGuiVulkan.uiRenderPass;
     info.attachmentCount = 1;
     info.pAttachments = attachment;
-    info.width = vulkan.getSwapchainInfo().swapchainExtent.width;
-    info.height = vulkan.getSwapchainInfo().swapchainExtent.height;
+    info.width = vulkan.getSwapchainInfo().swapChainExtent.width;
+    info.height = vulkan.getSwapchainInfo().swapChainExtent.height;
     info.layers = 1;
 
     for (uint32_t i = 0; i < vulkan.getSwapchainInfo().swapchainImages.size(); ++i) {

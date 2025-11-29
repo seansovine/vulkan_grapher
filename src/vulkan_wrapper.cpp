@@ -1,19 +1,26 @@
 #include "vulkan_wrapper.h"
 
+#include <GLFW/glfw3.h>
+#include <vulkan/vulkan_core.h>
+
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "shaderloader.h"
+#include "uniforms.h"
 #include "vulkan_debug.h"
 #include "vulkan_helper.h"
 
-#include <GLFW/glfw3.h>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
-#include <vulkan/vulkan_core.h>
 
 // State management functions.
 
 void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                                  const std::vector<Vertex> &vertexData) {
+                             const std::vector<Vertex> &vertexData) {
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
 
@@ -31,11 +38,13 @@ void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_
     createSwapchain();
     createImageViews();
     createRenderPass();
+    createDescriptorSetLayout();
     createGraphicsPipeline();
 
     createFramebuffers();
     createCommandPool();
     createVertexBuffer(vertexData);
+    createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
     createDescriptorPool();
@@ -52,16 +61,20 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     }
 
     vkDeviceWaitIdle(logicalDevice);
-    cleanupSwapchain();
+    cleanupSwapChain();
 
     // Recreate main application Vulkan resources
     createSwapchain();
     createImageViews();
     createRenderPass();
+    // TODO: Note sure if this is necessary.
+    createDescriptorSetLayout();
     createGraphicsPipeline();
 
     createFramebuffers();
     createDescriptorPool();
+    // TODO: Note sure if this is necessary.
+    createUniformBuffers();
     createCommandBuffers();
 }
 
@@ -103,6 +116,13 @@ void GlfwVulkanWrapper::deinit() {
         vkDestroyImageView(logicalDevice, imageView, nullptr);
     }
 
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(logicalDevice, uniformInfo.uniformBuffers[i], nullptr);
+        vkFreeMemory(logicalDevice, uniformInfo.uniformBuffersMemory[i], nullptr);
+    }
+
+    vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
+
     vkDestroySwapchainKHR(logicalDevice, swapChainInfo.swapchain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDevice(logicalDevice, nullptr);
@@ -112,8 +132,6 @@ void GlfwVulkanWrapper::deinit() {
 // Rendering functions.
 
 void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
-    // Sync for next frame. Fences also need to be manually reset
-    // unlike semaphores, which is done below.
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -128,6 +146,8 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
+    updateUniformBuffer(currentFrame);
+
     // Check if a previous frame is using this image (i.e. there is its fence to wait on)
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
         vkWaitForFences(logicalDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -137,10 +157,12 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
     // Record UI draw data
-    VkCommandBuffer uiBuffer = uiDrawCallback(imageIndex, swapChainInfo.swapchainExtent);
+    VkCommandBuffer uiBuffer = uiDrawCallback(imageIndex, swapChainInfo.swapChainExtent);
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
     VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -200,10 +222,27 @@ void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
     vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
+void GlfwVulkanWrapper::updateUniformBuffer(uint32_t currentImage) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    TransformsUniform ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f),
+                                swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f,
+                                10.0f);
+    ubo.proj[1][1] *= -1;
+
+    memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
 // Misc. helpers used by initialization.
 
 ImGui_ImplVulkan_InitInfo GlfwVulkanWrapper::imGuiInitInfo(VkDescriptorPool uiDescriptorPool,
-                                                                VkRenderPass uiRenderPass) {
+                                                           VkRenderPass uiRenderPass) {
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = instance;
     init_info.PhysicalDevice = physicalDevice;
@@ -243,15 +282,15 @@ bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
     // Check if Swap Chain support is adequate
     bool swapChainAdequate = false;
     if (extensionsSupported) {
-        SwapchainConfiguration swapchainConfig = querySwapchainSupport(device);
+        SwapchainConfig swapchainConfig = querySwapchainSupport(device);
         swapChainAdequate = !swapchainConfig.presentModes.empty() && !swapchainConfig.surfaceFormats.empty();
     }
 
     return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
-SwapchainConfiguration GlfwVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
-    SwapchainConfiguration config = {};
+SwapchainConfig GlfwVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
+    SwapchainConfig config = {};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &config.capabilities);
 
     uint32_t formatCount;
@@ -296,6 +335,35 @@ uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryProperty
     }
 
     throw std::runtime_error("failed to find suitable memory type!");
+}
+
+// Buffer creation helper.
+
+void GlfwVulkanWrapper::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+                                     VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(logicalDevice, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(logicalDevice, buffer, bufferMemory, 0);
 }
 
 // Swap chain creation helpers.
@@ -504,7 +572,7 @@ void GlfwVulkanWrapper::createLogicalDevice() {
 // Setup methods that use the logical device.
 
 void GlfwVulkanWrapper::createSwapchain() {
-    SwapchainConfiguration configuration = querySwapchainSupport(physicalDevice);
+    SwapchainConfig configuration = querySwapchainSupport(physicalDevice);
 
     VkSurfaceFormatKHR surfaceFormat = pickSwapchainSurfaceFormat(configuration.surfaceFormats);
     VkExtent2D extent = pickSwapchainExtent(configuration.capabilities);
@@ -548,7 +616,7 @@ void GlfwVulkanWrapper::createSwapchain() {
     }
 
     swapChainInfo.swapchainImageFormat = surfaceFormat.format;
-    swapChainInfo.swapchainExtent = extent;
+    swapChainInfo.swapChainExtent = extent;
 
     // Store the handles to the swap chain images for later use
     uint32_t swapchainCount;
@@ -628,6 +696,24 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
+void GlfwVulkanWrapper::createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+}
+
 void GlfwVulkanWrapper::createGraphicsPipeline() {
     // Load our shader modules in from disk
     auto vertShaderCode = ShaderLoader::load("shaders/vert.spv");
@@ -674,14 +760,14 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChainInfo.swapchainExtent.width);
-    viewport.height = static_cast<float>(swapChainInfo.swapchainExtent.height);
+    viewport.width = static_cast<float>(swapChainInfo.swapChainExtent.width);
+    viewport.height = static_cast<float>(swapChainInfo.swapChainExtent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     // Create a scissor. Any pixels outside the scissor region will be discarded
     VkRect2D scissor = {};
-    scissor.extent = swapChainInfo.swapchainExtent;
+    scissor.extent = swapChainInfo.swapChainExtent;
     scissor.offset = {0, 0};
 
     VkPipelineViewportStateCreateInfo viewPortCreateInfo = {};
@@ -736,6 +822,8 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     // Create a pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    // pipelineLayoutCreateInfo.setLayoutCount = 1;
+    // pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
 
     if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr, &graphicsPipelineLayout) !=
         VK_SUCCESS) {
@@ -782,8 +870,8 @@ void GlfwVulkanWrapper::createFramebuffers() {
         framebufferInfo.renderPass = renderPass;
         framebufferInfo.attachmentCount = 1;
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapChainInfo.swapchainExtent.width;
-        framebufferInfo.height = swapChainInfo.swapchainExtent.height;
+        framebufferInfo.width = swapChainInfo.swapChainExtent.width;
+        framebufferInfo.height = swapChainInfo.swapChainExtent.height;
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &swapChainInfo.swapchainFramebuffers[i]) !=
@@ -804,35 +892,33 @@ void GlfwVulkanWrapper::createCommandPool() {
 }
 
 void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
 
-    if (vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create vertex buffer!");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(
-        memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
-    }
-
-    vkBindBufferMemory(logicalDevice, vertexBuffer, vertexBufferMemory, 0);
+    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexBuffer,
+                 vertexBufferMemory);
 
     void *data;
-    vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, vertexData.data(), (size_t)bufferInfo.size);
+    vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertexData.data(), (size_t)bufferSize);
     vkUnmapMemory(logicalDevice, vertexBufferMemory);
+}
+
+void GlfwVulkanWrapper::createUniformBuffers() {
+    VkDeviceSize bufferSize = sizeof(TransformsUniform);
+
+    uniformInfo.uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformInfo.uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformInfo.uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     uniformInfo.uniformBuffers[i], uniformInfo.uniformBuffersMemory[i]);
+
+        vkMapMemory(logicalDevice, uniformInfo.uniformBuffersMemory[i], 0, bufferSize, 0,
+                    &uniformInfo.uniformBuffersMapped[i]);
+    }
 }
 
 void GlfwVulkanWrapper::createCommandBuffers() {
@@ -847,39 +933,40 @@ void GlfwVulkanWrapper::createCommandBuffers() {
     if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers!");
     }
+}
 
-    for (size_t i = 0; i < commandBuffers.size(); ++i) {
-        VkCommandBufferBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-        if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to begin recording command buffers!");
-        }
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
 
-        VkRenderPassBeginInfo renderPassInfo = {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = swapChainInfo.swapchainFramebuffers[i];
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = swapChainInfo.swapchainExtent;
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapChainInfo.swapchainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainInfo.swapChainExtent;
 
-        // Set the clear color value to black
-        VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
 
-        // Begin recording commands into the command buffer
-        vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-        VkBuffer vertexBuffers[] = {vertexBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-        vkCmdDraw(commandBuffers[i], vertexDataSize, 1, 0, 0);
-        vkCmdEndRenderPass(commandBuffers[i]);
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to record command buffers!");
-        }
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdDraw(commandBuffer, vertexDataSize, 1, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to record command buffer!");
     }
 }
 
@@ -932,7 +1019,7 @@ void GlfwVulkanWrapper::createDescriptorPool() {
 
 // Cleanup methods.
 
-void GlfwVulkanWrapper::cleanupSwapchain() {
+void GlfwVulkanWrapper::cleanupSwapChain() {
     for (auto &swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, swapchainFramebuffer, nullptr);
     }

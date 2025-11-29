@@ -23,7 +23,7 @@ struct SwapChainInfo {
     VkSwapchainKHR swapchain;
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
-    VkExtent2D swapchainExtent;
+    VkExtent2D swapChainExtent;
     VkFormat swapchainImageFormat;
     std::vector<VkFramebuffer> swapchainFramebuffers;
 };
@@ -34,7 +34,7 @@ struct QueueFamilyIndices {
     uint32_t presentFamilyIndex;
 };
 
-struct SwapchainConfiguration {
+struct SwapchainConfig {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> surfaceFormats;
     std::vector<VkPresentModeKHR> presentModes;
@@ -60,6 +60,12 @@ struct DebugInfo {
 #endif
 };
 
+struct UniformInfo {
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void *> uniformBuffersMapped;
+};
+
 // Main interface class.
 
 class GlfwVulkanWrapper {
@@ -79,14 +85,17 @@ private:
     SwapChainInfo swapChainInfo;
     VkRenderPass renderPass;
 
-    VkPipeline graphicsPipeline;
+    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout graphicsPipelineLayout;
+    VkPipeline graphicsPipeline;
 
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+
+    UniformInfo uniformInfo;
 
     uint32_t imageCount = 0;
     uint32_t currentFrame = 0;
@@ -129,6 +138,8 @@ public:
 
     // Rendering functions.
     void drawFrame(GLFWwindow *window, bool frameBufferResized);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void updateUniformBuffer(uint32_t currentImage);
     void updateMesh(const std::vector<Vertex> &vertexData);
 
 public:
@@ -151,9 +162,13 @@ private:
     // Misc. helpers used by initialization.
     std::vector<const char *> getRequiredExtensions() const;
     bool isDeviceSuitable(VkPhysicalDevice device);
-    SwapchainConfiguration querySwapchainSupport(const VkPhysicalDevice &device);
+    SwapchainConfig querySwapchainSupport(const VkPhysicalDevice &device);
     VkShaderModule createShaderModule(const std::vector<char> &shaderCode);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    // Buffer creation helper.
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                      VkDeviceMemory &bufferMemory);
 
     // Swap chain creation helpers.
     VkExtent2D pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);
@@ -172,17 +187,19 @@ private:
     void createSwapchain();
     void createImageViews();
     void createRenderPass();
+    void createDescriptorSetLayout();
     void createGraphicsPipeline();
 
     void createFramebuffers();
     void createCommandPool();
     void createVertexBuffer(const std::vector<Vertex> &vertexData);
+    void createUniformBuffers();
     void createCommandBuffers();
     void createSyncObjects();
     void createDescriptorPool();
 
     // Cleanup methods.
-    void cleanupSwapchain();
+    void cleanupSwapChain();
 };
 
 #endif // VULKAN_WRAPPER_H_
