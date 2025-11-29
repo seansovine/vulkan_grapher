@@ -25,9 +25,8 @@ private:
     void initVulkan();
     void initUI();
 
-    void drawFrame();
     void drawUI();
-    void recordUICommands(uint32_t bufferIdx);
+    void drawFrame();
     void recreateSwapchain();
 
     // This is currently toggles between the two example vertex sets updates
@@ -51,7 +50,7 @@ private:
     bool framebufferResized = false;
 
     GLFWwindow *window;
-    GlfwImGuiVulkanWrapper vulkan;
+    GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
 
     TestVertexSet currentTestVertexSet;

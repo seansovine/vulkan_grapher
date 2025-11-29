@@ -7,6 +7,7 @@
 #include <imgui/imgui.h>
 
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 // GLFW callbacks.
 
@@ -39,7 +40,7 @@ Application::~Application() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    vulkan.deinit(imGuiVulkan);
+    vulkan.deinit();
 
     // Cleanup GLFW
     glfwDestroyWindow(window);
@@ -62,8 +63,16 @@ void Application::initUI() {
 
     // Provide bind points from Vulkan API
     ImGui_ImplGlfw_InitForVulkan(window, true);
-    ImGui_ImplVulkan_InitInfo init_info = vulkan.imGuiInitInfo(imGuiVulkan);
+    ImGui_ImplVulkan_InitInfo init_info = vulkan.imGuiInitInfo(imGuiVulkan.uiDescriptorPool, imGuiVulkan.uiRenderPass);
     ImGui_ImplVulkan_Init(&init_info);
+
+    // Set ui callbacks on Vulkan wrapper.
+    vulkan.setUiDeinitCallback([this](VkDevice logicalDevice) {
+        imGuiVulkan.deinit(logicalDevice); //
+    });
+    vulkan.setUiDrawCallback([this](uint32_t bufferIdx, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
+        return imGuiVulkan.recordCommands(bufferIdx, swapchainExtent);
+    });
 }
 
 void Application::initVulkan() {
@@ -147,7 +156,7 @@ void Application::toggleMesh() {
 }
 
 void Application::drawFrame() {
-    vulkan.drawFrame(window, imGuiVulkan, framebufferResized);
+    vulkan.drawFrame(window, framebufferResized);
 }
 
 // Vulkan and ImGui helpers.
@@ -175,10 +184,6 @@ void Application::createUICommandBuffers() {
                                  imGuiVulkan.uiCommandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("Unable to allocate UI command buffers!");
     }
-}
-
-void Application::recordUICommands(uint32_t bufferIdx) {
-    //
 }
 
 void Application::createUICommandPool(VkCommandPool *cmdPool, VkCommandPoolCreateFlags flags) {

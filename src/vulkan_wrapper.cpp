@@ -8,10 +8,11 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 // State management functions.
 
-void GlfwImGuiVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
+void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
                                   const std::vector<Vertex> &vertexData) {
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
@@ -41,7 +42,7 @@ void GlfwImGuiVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, ui
 }
 
 // If swapchain is invalidated, like during window resize, recreate it.
-void GlfwImGuiVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
+void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
     while (width == 0 || height == 0) {
@@ -64,29 +65,20 @@ void GlfwImGuiVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     createCommandBuffers();
 }
 
-void GlfwImGuiVulkanWrapper::waitForDeviceIdle() {
+void GlfwVulkanWrapper::waitForDeviceIdle() {
     // Wait for unfinished work on GPU to complete.
     vkDeviceWaitIdle(logicalDevice);
 }
 
-void GlfwImGuiVulkanWrapper::deinit(ImGuiVulkanData uiVulkanData) {
-    if (enableValidationLayers) {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+void GlfwVulkanWrapper::deinit() {
+    if (debugInfo.enableValidationLayers) {
+        DestroyDebugUtilsMessengerEXT(instance, debugInfo.debugMessenger, nullptr);
     }
 
-    vkDestroyDescriptorPool(logicalDevice, uiVulkanData.uiDescriptorPool, nullptr);
-    vkFreeCommandBuffers(logicalDevice, uiVulkanData.uiCommandPool,
-                         static_cast<uint32_t>(uiVulkanData.uiCommandBuffers.size()),
-                         uiVulkanData.uiCommandBuffers.data());
-    vkDestroyCommandPool(logicalDevice, uiVulkanData.uiCommandPool, nullptr);
-    vkDestroyRenderPass(logicalDevice, uiVulkanData.uiRenderPass, nullptr);
+    uiDeinitCallback(logicalDevice);
 
     vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
     vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
-
-    for (auto framebuffer : uiVulkanData.uiFramebuffers) {
-        vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
-    }
 
     // Cleanup Vulkan
     vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
@@ -119,7 +111,7 @@ void GlfwImGuiVulkanWrapper::deinit(ImGuiVulkanData uiVulkanData) {
 
 // Rendering functions.
 
-void GlfwImGuiVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanData, bool frameBufferResized) {
+void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
     // Sync for next frame. Fences also need to be manually reset
     // unlike semaphores, which is done below.
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -145,14 +137,14 @@ void GlfwImGuiVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVul
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
     // Record UI draw data
-    uiVulkanData.recordCommands(imageIndex, swapChainInfo.swapchainExtent);
+    VkCommandBuffer uiBuffer = uiDrawCallback(imageIndex, swapChainInfo.swapchainExtent);
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiVulkanData.uiCommandBuffers[imageIndex]};
+    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiBuffer};
 
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -196,7 +188,7 @@ void GlfwImGuiVulkanWrapper::drawFrame(GLFWwindow *window, ImGuiVulkanData uiVul
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void GlfwImGuiVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
+void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
     // This is currently for updating the data; not chaning the count.
     size_t dataSizeBytes = sizeof(vertexData[0]) * vertexData.size();
     assert(vertexData.size() == vertexDataSize);
@@ -210,23 +202,24 @@ void GlfwImGuiVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
 
 // Misc. helpers used by initialization.
 
-ImGui_ImplVulkan_InitInfo GlfwImGuiVulkanWrapper::imGuiInitInfo(ImGuiVulkanData uiVulkanData) {
+ImGui_ImplVulkan_InitInfo GlfwVulkanWrapper::imGuiInitInfo(VkDescriptorPool uiDescriptorPool,
+                                                                VkRenderPass uiRenderPass) {
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = instance;
     init_info.PhysicalDevice = physicalDevice;
     init_info.Device = logicalDevice;
     init_info.QueueFamily = queueIndices.graphicsFamilyIndex;
     init_info.Queue = graphicsQueue;
-    init_info.DescriptorPool = uiVulkanData.uiDescriptorPool;
+    init_info.DescriptorPool = uiDescriptorPool;
     init_info.MinImageCount = imageCount;
     init_info.ImageCount = imageCount;
-    init_info.PipelineInfoMain.RenderPass = uiVulkanData.uiRenderPass;
+    init_info.PipelineInfoMain.RenderPass = uiRenderPass;
     init_info.PipelineInfoMain.Subpass = 0;
     init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     return init_info;
 }
 
-std::vector<const char *> GlfwImGuiVulkanWrapper::getRequiredExtensions() const {
+std::vector<const char *> GlfwVulkanWrapper::getRequiredExtensions() const {
     uint32_t glfwExtensionCount = 0;
     const char **glfwRequiredExtensions;
     glfwRequiredExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -236,16 +229,16 @@ std::vector<const char *> GlfwImGuiVulkanWrapper::getRequiredExtensions() const 
         std::cout << extension << std::endl;
     }
 
-    if (enableValidationLayers) {
+    if (debugInfo.enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
     return extensions;
 }
 
-bool GlfwImGuiVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
+bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(device, &properties);
-    bool extensionsSupported = VulkanHelper::checkDeviceExtensions(device, deviceExtensions);
+    bool extensionsSupported = VulkanHelper::checkDeviceExtensions(device, debugInfo.deviceExtensions);
 
     // Check if Swap Chain support is adequate
     bool swapChainAdequate = false;
@@ -257,7 +250,7 @@ bool GlfwImGuiVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
     return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
-SwapchainConfiguration GlfwImGuiVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
+SwapchainConfiguration GlfwVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
     SwapchainConfiguration config = {};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &config.capabilities);
 
@@ -278,7 +271,7 @@ SwapchainConfiguration GlfwImGuiVulkanWrapper::querySwapchainSupport(const VkPhy
     return config;
 }
 
-VkShaderModule GlfwImGuiVulkanWrapper::createShaderModule(const std::vector<char> &shaderCode) {
+VkShaderModule GlfwVulkanWrapper::createShaderModule(const std::vector<char> &shaderCode) {
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = shaderCode.size();
@@ -292,7 +285,7 @@ VkShaderModule GlfwImGuiVulkanWrapper::createShaderModule(const std::vector<char
     return shaderModule;
 }
 
-uint32_t GlfwImGuiVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
@@ -307,7 +300,7 @@ uint32_t GlfwImGuiVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryPro
 
 // Swap chain creation helpers.
 
-VkExtent2D GlfwImGuiVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities) {
+VkExtent2D GlfwVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities) {
     if (surfaceCapabilities.currentExtent.width != UINT32_MAX) {
         return surfaceCapabilities.currentExtent;
     } else {
@@ -320,7 +313,7 @@ VkExtent2D GlfwImGuiVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabiliti
     }
 }
 
-VkPresentModeKHR GlfwImGuiVulkanWrapper::pickSwapchainPresentMode(const std::vector<VkPresentModeKHR> &presentModes) {
+VkPresentModeKHR GlfwVulkanWrapper::pickSwapchainPresentMode(const std::vector<VkPresentModeKHR> &presentModes) {
     // Look for triple-buffering present mode if available
     for (VkPresentModeKHR availableMode : presentModes) {
         if (availableMode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -332,7 +325,7 @@ VkPresentModeKHR GlfwImGuiVulkanWrapper::pickSwapchainPresentMode(const std::vec
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkSurfaceFormatKHR GlfwImGuiVulkanWrapper::pickSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
+VkSurfaceFormatKHR GlfwVulkanWrapper::pickSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
     for (VkSurfaceFormatKHR availableFormat : formats) {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR) {
@@ -347,8 +340,8 @@ VkSurfaceFormatKHR GlfwImGuiVulkanWrapper::pickSwapchainSurfaceFormat(const std:
 
 // Methods for Vulkan setup sequence.
 
-void GlfwImGuiVulkanWrapper::createInstance() {
-    if (enableValidationLayers && !VulkanHelper::checkValidationLayerSupport(validationLayers)) {
+void GlfwVulkanWrapper::createInstance() {
+    if (debugInfo.enableValidationLayers && !VulkanHelper::checkValidationLayerSupport(debugInfo.validationLayers)) {
         throw std::runtime_error("Unable to establish validation layer support!");
     }
 
@@ -362,18 +355,18 @@ void GlfwImGuiVulkanWrapper::createInstance() {
     applicationInfo.pNext = nullptr;
 
     // Grab the needed Vulkan extensions. This also initializes the list of required extensions
-    requiredExtensions = getRequiredExtensions();
+    debugInfo.requiredExtensions = getRequiredExtensions();
     VkInstanceCreateInfo instanceCreateInfo = {};
     instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
-    instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
-    instanceCreateInfo.ppEnabledExtensionNames = requiredExtensions.data();
+    instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(debugInfo.requiredExtensions.size());
+    instanceCreateInfo.ppEnabledExtensionNames = debugInfo.requiredExtensions.data();
 
     // Enable validation layers and debug messenger if needed
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
-    if (enableValidationLayers) {
-        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+    if (debugInfo.enableValidationLayers) {
+        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(debugInfo.validationLayers.size());
+        instanceCreateInfo.ppEnabledLayerNames = debugInfo.validationLayers.data();
 
         PopulateDebugMessengerCreateInfo(debugCreateInfo);
         debugCreateInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT *>(&debugCreateInfo);
@@ -387,27 +380,27 @@ void GlfwImGuiVulkanWrapper::createInstance() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::setupDebugMessenger() {
-    if (!enableValidationLayers) {
+void GlfwVulkanWrapper::setupDebugMessenger() {
+    if (!debugInfo.enableValidationLayers) {
         return;
     }
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
     PopulateDebugMessengerCreateInfo(createInfo);
 
-    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugInfo.debugMessenger) != VK_SUCCESS) {
         throw std::runtime_error("Failed to setup debug messenger!");
     }
 }
 
 // For cross-platform compatibility we let GLFW take care of the surface creation
-void GlfwImGuiVulkanWrapper::createSurface(GLFWwindow *window) {
+void GlfwVulkanWrapper::createSurface(GLFWwindow *window) {
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create window surface!");
     }
 }
 
-void GlfwImGuiVulkanWrapper::pickPhysicalDevice() {
+void GlfwVulkanWrapper::pickPhysicalDevice() {
     uint32_t physicalDeviceCount = 0;
     if (vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("Unable to enumerate physical devices!");
@@ -442,7 +435,7 @@ void GlfwImGuiVulkanWrapper::pickPhysicalDevice() {
     physicalDevice = physicalDevices[0];
 }
 
-void GlfwImGuiVulkanWrapper::getDeviceQueueIndices() {
+void GlfwVulkanWrapper::getDeviceQueueIndices() {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
@@ -467,7 +460,7 @@ void GlfwImGuiVulkanWrapper::getDeviceQueueIndices() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createLogicalDevice() {
+void GlfwVulkanWrapper::createLogicalDevice() {
     std::set<uint32_t> uniqueQueueIndices = {queueIndices.graphicsFamilyIndex, queueIndices.presentFamilyIndex};
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float priority = 1.0f;
@@ -486,15 +479,15 @@ void GlfwImGuiVulkanWrapper::createLogicalDevice() {
     deviceInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-    deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(debugInfo.deviceExtensions.size());
+    deviceInfo.ppEnabledExtensionNames = debugInfo.deviceExtensions.data();
 
     VkPhysicalDeviceFeatures physicalDeviceFeatures = {}; // TODO Specify features
     deviceInfo.pEnabledFeatures = &physicalDeviceFeatures;
 
-    if (enableValidationLayers) {
-        deviceInfo.enabledLayerCount = validationLayers.size();
-        deviceInfo.ppEnabledLayerNames = validationLayers.data();
+    if (debugInfo.enableValidationLayers) {
+        deviceInfo.enabledLayerCount = debugInfo.validationLayers.size();
+        deviceInfo.ppEnabledLayerNames = debugInfo.validationLayers.data();
     } else {
         deviceInfo.enabledLayerCount = 0;
     }
@@ -510,7 +503,7 @@ void GlfwImGuiVulkanWrapper::createLogicalDevice() {
 
 // Setup methods that use the logical device.
 
-void GlfwImGuiVulkanWrapper::createSwapchain() {
+void GlfwVulkanWrapper::createSwapchain() {
     SwapchainConfiguration configuration = querySwapchainSupport(physicalDevice);
 
     VkSurfaceFormatKHR surfaceFormat = pickSwapchainSurfaceFormat(configuration.surfaceFormats);
@@ -565,7 +558,7 @@ void GlfwImGuiVulkanWrapper::createSwapchain() {
                             swapChainInfo.swapchainImages.data());
 }
 
-void GlfwImGuiVulkanWrapper::createImageViews() {
+void GlfwVulkanWrapper::createImageViews() {
     swapChainInfo.swapchainImageViews.resize(swapChainInfo.swapchainImages.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImages.size(); ++i) {
         VkImageViewCreateInfo createInfo = {};
@@ -590,7 +583,7 @@ void GlfwImGuiVulkanWrapper::createImageViews() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createRenderPass() {
+void GlfwVulkanWrapper::createRenderPass() {
     // Configure a color attachment that will determine how the framebuffer is used
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapChainInfo.swapchainImageFormat;
@@ -635,7 +628,7 @@ void GlfwImGuiVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createGraphicsPipeline() {
+void GlfwVulkanWrapper::createGraphicsPipeline() {
     // Load our shader modules in from disk
     auto vertShaderCode = ShaderLoader::load("shaders/vert.spv");
     auto fragShaderCode = ShaderLoader::load("shaders/frag.spv");
@@ -778,7 +771,7 @@ void GlfwImGuiVulkanWrapper::createGraphicsPipeline() {
     vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
 }
 
-void GlfwImGuiVulkanWrapper::createFramebuffers() {
+void GlfwVulkanWrapper::createFramebuffers() {
     swapChainInfo.swapchainFramebuffers.resize(swapChainInfo.swapchainImageViews.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImageViews.size(); ++i) {
         // We need to attach an image view to the frame buffer for presentation purposes
@@ -800,7 +793,7 @@ void GlfwImGuiVulkanWrapper::createFramebuffers() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createCommandPool() {
+void GlfwVulkanWrapper::createCommandPool() {
     VkCommandPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     createInfo.queueFamilyIndex = queueIndices.graphicsFamilyIndex;
@@ -810,7 +803,7 @@ void GlfwImGuiVulkanWrapper::createCommandPool() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
+void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
@@ -842,7 +835,7 @@ void GlfwImGuiVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &verte
     vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
-void GlfwImGuiVulkanWrapper::createCommandBuffers() {
+void GlfwVulkanWrapper::createCommandBuffers() {
     commandBuffers.resize(swapChainInfo.swapchainFramebuffers.size());
 
     VkCommandBufferAllocateInfo allocInfo = {};
@@ -890,7 +883,7 @@ void GlfwImGuiVulkanWrapper::createCommandBuffers() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createSyncObjects() {
+void GlfwVulkanWrapper::createSyncObjects() {
     // Create our semaphores and fences for synchronizing the GPU and CPU
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -921,7 +914,7 @@ void GlfwImGuiVulkanWrapper::createSyncObjects() {
     }
 }
 
-void GlfwImGuiVulkanWrapper::createDescriptorPool() {
+void GlfwVulkanWrapper::createDescriptorPool() {
     VkDescriptorPoolSize poolSize = {};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(swapChainInfo.swapchainImages.size());
@@ -939,7 +932,7 @@ void GlfwImGuiVulkanWrapper::createDescriptorPool() {
 
 // Cleanup methods.
 
-void GlfwImGuiVulkanWrapper::cleanupSwapchain() {
+void GlfwVulkanWrapper::cleanupSwapchain() {
     for (auto &swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, swapchainFramebuffer, nullptr);
     }

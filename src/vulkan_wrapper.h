@@ -7,10 +7,10 @@
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
 
-#include "imgui_vulkan_data.h"
 #include "vertex.h"
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 // A first version of abstracting over the Vulkan interface as a component
@@ -40,9 +40,7 @@ struct SwapchainConfiguration {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-// Main interface class.
-
-class GlfwImGuiVulkanWrapper {
+struct DebugInfo {
     // Extension information.
     std::vector<const char *> requiredExtensions;
     const std::vector<const char *> deviceExtensions = {
@@ -60,6 +58,12 @@ class GlfwImGuiVulkanWrapper {
 #else
     const bool enableValidationLayers = true;
 #endif
+};
+
+// Main interface class.
+
+class GlfwVulkanWrapper {
+    DebugInfo debugInfo;
 
 private:
     // Main Vulkan entities.
@@ -95,20 +99,36 @@ private:
 
     VkDescriptorPool descriptorPool;
 
+    using DeinitCallback = void(VkDevice);
+    using DrawCallback = VkCommandBuffer(uint32_t, const VkExtent2D &);
+
+    // UI callbacks for dependency injection.
+    std::function<DeinitCallback> uiDeinitCallback;
+    std::function<DrawCallback> uiDrawCallback;
+
 public:
     uint32_t windowWidth;
     uint32_t windowHeight;
     uint32_t vertexDataSize;
 
 public:
-    // State management functions.
+    // Initialization functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const std::vector<Vertex> &vertexData);
+
+    void setUiDeinitCallback(const std::function<DeinitCallback> &inUiDeinitCallback) {
+        uiDeinitCallback = inUiDeinitCallback;
+    }
+    void setUiDrawCallback(const std::function<DrawCallback> &inUiDrawCallback) {
+        uiDrawCallback = inUiDrawCallback;
+    }
+
+    // State management functions.
     void recreateSwapchain(GLFWwindow *window);
     void waitForDeviceIdle();
-    void deinit(ImGuiVulkanData uiVulkanData);
+    void deinit();
 
     // Rendering functions.
-    void drawFrame(GLFWwindow *window, ImGuiVulkanData uiVulkanData, bool frameBufferResized);
+    void drawFrame(GLFWwindow *window, bool frameBufferResized);
     void updateMesh(const std::vector<Vertex> &vertexData);
 
 public:
@@ -125,7 +145,7 @@ public:
         return queueIndices;
     }
 
-    ImGui_ImplVulkan_InitInfo imGuiInitInfo(ImGuiVulkanData uiVulkanData);
+    ImGui_ImplVulkan_InitInfo imGuiInitInfo(VkDescriptorPool uiDescriptorPool, VkRenderPass uiRenderPass);
 
 private:
     // Misc. helpers used by initialization.

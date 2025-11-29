@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 struct ImGuiVulkanData {
     VkCommandPool uiCommandPool;
@@ -13,7 +14,9 @@ struct ImGuiVulkanData {
     VkRenderPass uiRenderPass;
     VkDescriptorPool uiDescriptorPool;
 
-    void recordCommands(uint32_t bufferIdx, const VkExtent2D &swapchainExtent);
+    VkCommandBuffer recordCommands(uint32_t bufferIdx, const VkExtent2D &swapchainExtent);
+
+    void deinit(VkDevice logicalDevice);
 };
 
 #endif // IMGUI_VULKAN_DATA_H_
