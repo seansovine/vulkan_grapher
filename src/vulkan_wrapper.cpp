@@ -67,13 +67,13 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     createSwapchain();
     createImageViews();
     createRenderPass();
-    // TODO: Note sure if this is necessary.
+    // TODO: Not sure if this is necessary.
     createDescriptorSetLayout();
     createGraphicsPipeline();
 
     createFramebuffers();
     createDescriptorPool();
-    // TODO: Note sure if this is necessary.
+    // TODO: Not sure if this is necessary.
     createUniformBuffers();
     createCommandBuffers();
 }
@@ -108,8 +108,8 @@ void GlfwVulkanWrapper::deinit() {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     }
 
-    vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, graphicsPipelineLayout, nullptr);
+    vkDestroyPipeline(logicalDevice, pipeline, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
 
     for (auto imageView : swapChainInfo.swapchainImageViews) {
@@ -146,7 +146,7 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    updateUniformBuffer(currentFrame);
+    updateUniformBuffer(imageIndex);
 
     // Check if a previous frame is using this image (i.e. there is its fence to wait on)
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
@@ -700,8 +700,8 @@ void GlfwVulkanWrapper::createRenderPass() {
 void GlfwVulkanWrapper::createDescriptorSetLayout() {
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.pImmutableSamplers = nullptr;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
@@ -737,7 +737,6 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-    // Create information struct for vertex input
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -749,15 +748,11 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
-    // Create information struct about input assembly
-    // We'll be organizing our vertices in triangles and the GPU should treat the data accordingly
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {};
     inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-    // Create a viewport. The extent of the viewport will always
-    // be the size of the images in the swapchain
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -766,7 +761,6 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    // Create a scissor. Any pixels outside the scissor region will be discarded
     VkRect2D scissor = {};
     scissor.extent = swapChainInfo.swapChainExtent;
     scissor.offset = {0, 0};
@@ -821,37 +815,35 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     colorBlending.blendConstants[3] = 0.0f;
 
     // Create a pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
-    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr, &graphicsPipelineLayout) !=
-        VK_SUCCESS) {
+    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline layout!");
     }
 
     // Create the info for our graphics pipeline. We'll add a
     // programmable vertex and fragment shader stage
-    VkGraphicsPipelineCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    createInfo.stageCount = 2;
-    createInfo.pStages = shaderStages;
-    createInfo.pVertexInputState = &vertexInputInfo;
-    createInfo.pInputAssemblyState = &inputAssemblyInfo;
-    createInfo.pViewportState = &viewPortCreateInfo;
-    createInfo.pRasterizationState = &rasterizerCreateInfo;
-    createInfo.pMultisampleState = &multisamplingCreateInfo;
-    createInfo.pDepthStencilState = nullptr;
-    createInfo.pColorBlendState = &colorBlending;
-    createInfo.pDynamicState = nullptr;
-    createInfo.layout = graphicsPipelineLayout;
-    createInfo.renderPass = renderPass;
-    createInfo.subpass = 0;
-    createInfo.basePipelineHandle = VK_NULL_HANDLE;
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
+    pipelineInfo.pViewportState = &viewPortCreateInfo;
+    pipelineInfo.pRasterizationState = &rasterizerCreateInfo;
+    pipelineInfo.pMultisampleState = &multisamplingCreateInfo;
+    pipelineInfo.pDepthStencilState = nullptr;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = nullptr;
+    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &createInfo, nullptr, &graphicsPipeline) !=
-        VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline!");
     }
 
@@ -958,7 +950,7 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     VkBuffer vertexBuffers[] = {vertexBuffer};
     VkDeviceSize offsets[] = {0};
@@ -1029,8 +1021,8 @@ void GlfwVulkanWrapper::cleanupSwapChain() {
     vkFreeCommandBuffers(logicalDevice, commandPool, static_cast<uint32_t>(commandBuffers.size()),
                          commandBuffers.data());
 
-    vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, graphicsPipelineLayout, nullptr);
+    vkDestroyPipeline(logicalDevice, pipeline, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
 
     for (auto &swapchainImageView : swapChainInfo.swapchainImageViews) {

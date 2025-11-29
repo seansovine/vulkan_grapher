@@ -86,8 +86,8 @@ private:
     VkRenderPass renderPass;
 
     VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout graphicsPipelineLayout;
-    VkPipeline graphicsPipeline;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline pipeline;
 
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
