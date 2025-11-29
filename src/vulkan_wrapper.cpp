@@ -40,14 +40,15 @@ void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_
     createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
-
     createFramebuffers();
+
     createCommandPool();
     createVertexBuffer(vertexData);
     createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
-    createDescriptorPool();
 }
 
 // If swapchain is invalidated, like during window resize, recreate it.
@@ -60,82 +61,73 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(logicalDevice);
+    vkDeviceWaitIdle(device);
+
     cleanupSwapChain();
 
-    // Recreate main application Vulkan resources
+    // TODO: The ones uncommented are those steps used in vulkan-tutorial example.
+    // We should figure out what really needs done here. Tutorial is probably correct.
+
     createSwapchain();
     createImageViews();
-    createRenderPass();
-    // TODO: Not sure if this is necessary.
-    createDescriptorSetLayout();
-    createGraphicsPipeline();
-
+    // createRenderPass();
+    // createDescriptorSetLayout();
+    // createGraphicsPipeline();
     createFramebuffers();
-    createDescriptorPool();
-    // TODO: Not sure if this is necessary.
-    createUniformBuffers();
-    createCommandBuffers();
+    // createDescriptorPool();
+    // createUniformBuffers();
+    // createCommandBuffers();
 }
 
 void GlfwVulkanWrapper::waitForDeviceIdle() {
     // Wait for unfinished work on GPU to complete.
-    vkDeviceWaitIdle(logicalDevice);
+    vkDeviceWaitIdle(device);
 }
 
 void GlfwVulkanWrapper::deinit() {
+    uiDeinitCallback(device);
+
+    cleanupSwapChain();
+
+    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyRenderPass(device, renderPass, nullptr);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, uniformInfo.uniformBuffers[i], nullptr);
+        vkFreeMemory(device, uniformInfo.uniformBuffersMemory[i], nullptr);
+    }
+
+    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+    vkDestroyBuffer(device, vertexBuffer, nullptr);
+    vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+        vkDestroyFence(device, inFlightFences[i], nullptr);
+    }
+
+    vkDestroyCommandPool(device, commandPool, nullptr);
+    vkDestroyDevice(device, nullptr);
+
     if (debugInfo.enableValidationLayers) {
         DestroyDebugUtilsMessengerEXT(instance, debugInfo.debugMessenger, nullptr);
     }
 
-    uiDeinitCallback(logicalDevice);
-
-    vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
-    vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
-
-    // Cleanup Vulkan
-    vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
-
-    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-        vkDestroySemaphore(logicalDevice, imageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(logicalDevice, renderFinishedSemaphores[i], nullptr);
-        vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
-    }
-
-    vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
-
-    for (auto framebuffer : swapChainInfo.swapchainFramebuffers) {
-        vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
-    }
-
-    vkDestroyPipeline(logicalDevice, pipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-    vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
-
-    for (auto imageView : swapChainInfo.swapchainImageViews) {
-        vkDestroyImageView(logicalDevice, imageView, nullptr);
-    }
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(logicalDevice, uniformInfo.uniformBuffers[i], nullptr);
-        vkFreeMemory(logicalDevice, uniformInfo.uniformBuffersMemory[i], nullptr);
-    }
-
-    vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
-
-    vkDestroySwapchainKHR(logicalDevice, swapChainInfo.swapchain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyDevice(logicalDevice, nullptr);
     vkDestroyInstance(instance, nullptr);
 }
 
 // Rendering functions.
 
 void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
-    vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(logicalDevice, swapChainInfo.swapchain, UINT64_MAX,
+    VkResult result = vkAcquireNextImageKHR(device, swapChainInfo.swapchain, UINT64_MAX,
                                             imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     // If the window has been resized or another event causes the swap chain to become invalid,
@@ -146,15 +138,10 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    updateUniformBuffer(imageIndex);
-
-    // Check if a previous frame is using this image (i.e. there is its fence to wait on)
-    if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-        vkWaitForFences(logicalDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
-    }
-
-    // Mark the image as now being in use by this frame
-    imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+    updateUniformBuffer(currentFrame);
+    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+    vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
     // Record UI draw data
     VkCommandBuffer uiBuffer = uiDrawCallback(imageIndex, swapChainInfo.swapChainExtent);
@@ -162,26 +149,19 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    vkResetCommandBuffer(commandBuffers[imageIndex], /*VkCommandBufferResetFlagBits*/ 0);
-    recordCommandBuffer(commandBuffers[imageIndex], imageIndex);
-
     VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[imageIndex], uiBuffer};
-
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
+
+    std::array<VkCommandBuffer, 2> cmdBuffers = {commandBuffers[currentFrame], uiBuffer};
     submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
     submitInfo.pCommandBuffers = cmdBuffers.data();
 
     VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
-
-    // Reset the in-flight fences so we do not get blocked waiting on in-flight images
-    vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
 
     if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer!");
@@ -195,10 +175,12 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
     VkSwapchainKHR swapchains[] = {swapChainInfo.swapchain};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapchains;
+
     presentInfo.pImageIndices = &imageIndex;
 
     // Submit the present queue
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || frameBufferResized) {
         // Recreate the swap chain if the window size has changed
         frameBufferResized = false;
@@ -217,10 +199,10 @@ void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
     assert(vertexData.size() == vertexDataSize);
 
     void *data;
-    vkMapMemory(logicalDevice, vertexBufferMemory, 0, dataSizeBytes, 0, &data);
+    vkMapMemory(device, vertexBufferMemory, 0, dataSizeBytes, 0, &data);
     // Our buffer was created with the HOST_COHERENT bit, so we can update it here.
     memcpy(data, vertexData.data(), dataSizeBytes);
-    vkUnmapMemory(logicalDevice, vertexBufferMemory);
+    vkUnmapMemory(device, vertexBufferMemory);
 }
 
 void GlfwVulkanWrapper::updateUniformBuffer(uint32_t currentImage) {
@@ -247,7 +229,7 @@ ImGui_ImplVulkan_InitInfo GlfwVulkanWrapper::imGuiInitInfo(VkDescriptorPool uiDe
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = instance;
     init_info.PhysicalDevice = physicalDevice;
-    init_info.Device = logicalDevice;
+    init_info.Device = device;
     init_info.QueueFamily = queueIndices.graphicsFamilyIndex;
     init_info.Queue = graphicsQueue;
     init_info.DescriptorPool = uiDescriptorPool;
@@ -318,7 +300,7 @@ VkShaderModule GlfwVulkanWrapper::createShaderModule(const std::vector<char> &sh
     createInfo.pCode = reinterpret_cast<const uint32_t *>(shaderCode.data());
 
     VkShaderModule shaderModule;
-    if (vkCreateShaderModule(logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+    if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create shader module!");
     }
 
@@ -348,23 +330,23 @@ void GlfwVulkanWrapper::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to create buffer!");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(logicalDevice, buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate buffer memory!");
     }
 
-    vkBindBufferMemory(logicalDevice, buffer, bufferMemory, 0);
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
 // Swap chain creation helpers.
@@ -561,13 +543,13 @@ void GlfwVulkanWrapper::createLogicalDevice() {
         deviceInfo.enabledLayerCount = 0;
     }
 
-    if (vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &logicalDevice) != VK_SUCCESS) {
+    if (vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create logical device!");
     }
 
     // We use only the first queue in each family.
-    vkGetDeviceQueue(logicalDevice, queueIndices.graphicsFamilyIndex, 0, &graphicsQueue);
-    vkGetDeviceQueue(logicalDevice, queueIndices.presentFamilyIndex, 0, &presentQueue);
+    vkGetDeviceQueue(device, queueIndices.graphicsFamilyIndex, 0, &graphicsQueue);
+    vkGetDeviceQueue(device, queueIndices.presentFamilyIndex, 0, &presentQueue);
 }
 
 // Setup methods that use the logical device.
@@ -612,7 +594,7 @@ void GlfwVulkanWrapper::createSwapchain() {
     swapchainCreateInfo.clipped = VK_TRUE;
     swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    if (vkCreateSwapchainKHR(logicalDevice, &swapchainCreateInfo, nullptr, &swapChainInfo.swapchain) != VK_SUCCESS) {
+    if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapChainInfo.swapchain) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create swap chain!");
     }
 
@@ -621,10 +603,9 @@ void GlfwVulkanWrapper::createSwapchain() {
 
     // Store the handles to the swap chain images for later use
     uint32_t swapchainCount;
-    vkGetSwapchainImagesKHR(logicalDevice, swapChainInfo.swapchain, &swapchainCount, nullptr);
+    vkGetSwapchainImagesKHR(device, swapChainInfo.swapchain, &swapchainCount, nullptr);
     swapChainInfo.swapchainImages.resize(swapchainCount);
-    vkGetSwapchainImagesKHR(logicalDevice, swapChainInfo.swapchain, &swapchainCount,
-                            swapChainInfo.swapchainImages.data());
+    vkGetSwapchainImagesKHR(device, swapChainInfo.swapchain, &swapchainCount, swapChainInfo.swapchainImages.data());
 }
 
 void GlfwVulkanWrapper::createImageViews() {
@@ -639,21 +620,19 @@ void GlfwVulkanWrapper::createImageViews() {
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // We do not enable mip-mapping
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.baseMipLevel = 0;
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(logicalDevice, &createInfo, nullptr, &swapChainInfo.swapchainImageViews[i]) !=
-            VK_SUCCESS) {
+        if (vkCreateImageView(device, &createInfo, nullptr, &swapChainInfo.swapchainImageViews[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create image views!");
         }
     }
 }
 
 void GlfwVulkanWrapper::createRenderPass() {
-    // Configure a color attachment that will determine how the framebuffer is used
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapChainInfo.swapchainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -662,13 +641,12 @@ void GlfwVulkanWrapper::createRenderPass() {
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Comes before UI rendering now
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentReference colorAttachmentRef = {};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    // Define a subpass that is attached to the graphics pipeline
     VkSubpassDescription subpassDescription = {};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1;
@@ -682,7 +660,6 @@ void GlfwVulkanWrapper::createRenderPass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    // Create the info for the render pass
     VkRenderPassCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     createInfo.attachmentCount = 1;
@@ -692,7 +669,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     createInfo.dependencyCount = 1;
     createInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(logicalDevice, &createInfo, nullptr, &renderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device, &createInfo, nullptr, &renderPass) != VK_SUCCESS) {
         throw std::runtime_error("Could not create render pass!");
     }
 }
@@ -710,7 +687,7 @@ void GlfwVulkanWrapper::createDescriptorSetLayout() {
     layoutInfo.bindingCount = 1;
     layoutInfo.pBindings = &uboLayoutBinding;
 
-    if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
@@ -765,36 +742,36 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     scissor.extent = swapChainInfo.swapChainExtent;
     scissor.offset = {0, 0};
 
-    VkPipelineViewportStateCreateInfo viewPortCreateInfo = {};
-    viewPortCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewPortCreateInfo.viewportCount = 1;
-    viewPortCreateInfo.pViewports = &viewport;
-    viewPortCreateInfo.scissorCount = 1;
-    viewPortCreateInfo.pScissors = &scissor;
+    VkPipelineViewportStateCreateInfo viewPortInfo = {};
+    viewPortInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewPortInfo.viewportCount = 1;
+    viewPortInfo.pViewports = &viewport;
+    viewPortInfo.scissorCount = 1;
+    viewPortInfo.pScissors = &scissor;
 
     // Configure the rasterizer
-    VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo = {};
-    rasterizerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizerCreateInfo.depthClampEnable = VK_FALSE;
-    rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizerCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizerCreateInfo.lineWidth = 1.0f;
-    rasterizerCreateInfo.depthBiasEnable = VK_FALSE;
-    rasterizerCreateInfo.depthBiasConstantFactor = 0.0f;
-    rasterizerCreateInfo.depthBiasClamp = 0.0f;
-    rasterizerCreateInfo.depthBiasSlopeFactor = 0.0f;
+    VkPipelineRasterizationStateCreateInfo rasterizerInfo = {};
+    rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizerInfo.depthClampEnable = VK_FALSE;
+    rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
+    rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizerInfo.lineWidth = 1.0f;
+    rasterizerInfo.depthBiasEnable = VK_FALSE;
+    rasterizerInfo.depthBiasConstantFactor = 0.0f;
+    rasterizerInfo.depthBiasClamp = 0.0f;
+    rasterizerInfo.depthBiasSlopeFactor = 0.0f;
 
     // Configure multisampling
-    VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = {};
-    multisamplingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisamplingCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisamplingCreateInfo.sampleShadingEnable = VK_FALSE;
-    multisamplingCreateInfo.minSampleShading = 1.0f;
-    multisamplingCreateInfo.pSampleMask = nullptr;
-    multisamplingCreateInfo.alphaToCoverageEnable = VK_FALSE;
-    multisamplingCreateInfo.alphaToOneEnable = VK_FALSE;
+    VkPipelineMultisampleStateCreateInfo multisamplingInfo = {};
+    multisamplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisamplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisamplingInfo.sampleShadingEnable = VK_FALSE;
+    multisamplingInfo.minSampleShading = 1.0f;
+    multisamplingInfo.pSampleMask = nullptr;
+    multisamplingInfo.alphaToCoverageEnable = VK_FALSE;
+    multisamplingInfo.alphaToOneEnable = VK_FALSE;
 
     // Configure the color blending stage
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
@@ -820,7 +797,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline layout!");
     }
 
@@ -832,9 +809,9 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
-    pipelineInfo.pViewportState = &viewPortCreateInfo;
-    pipelineInfo.pRasterizationState = &rasterizerCreateInfo;
-    pipelineInfo.pMultisampleState = &multisamplingCreateInfo;
+    pipelineInfo.pViewportState = &viewPortInfo;
+    pipelineInfo.pRasterizationState = &rasterizerInfo;
+    pipelineInfo.pMultisampleState = &multisamplingInfo;
     pipelineInfo.pDepthStencilState = nullptr;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = nullptr;
@@ -843,13 +820,13 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline!");
     }
 
     // Cleanup our shader modules after pipeline creation
-    vkDestroyShaderModule(logicalDevice, vertShaderModule, nullptr);
-    vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
 }
 
 void GlfwVulkanWrapper::createFramebuffers() {
@@ -867,7 +844,7 @@ void GlfwVulkanWrapper::createFramebuffers() {
         framebufferInfo.height = swapChainInfo.swapChainExtent.height;
         framebufferInfo.layers = 1;
 
-        if (vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &swapChainInfo.swapchainFramebuffers[i]) !=
+        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainInfo.swapchainFramebuffers[i]) !=
             VK_SUCCESS) {
             throw std::runtime_error("Unable to create framebuffer!");
         }
@@ -880,7 +857,7 @@ void GlfwVulkanWrapper::createCommandPool() {
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = queueIndices.graphicsFamilyIndex;
 
-    if (vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics command pool!");
     }
 }
@@ -893,9 +870,9 @@ void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData
                  vertexBufferMemory);
 
     void *data;
-    vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferSize, 0, &data);
+    vkMapMemory(device, vertexBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, vertexData.data(), (size_t)bufferSize);
-    vkUnmapMemory(logicalDevice, vertexBufferMemory);
+    vkUnmapMemory(device, vertexBufferMemory);
 }
 
 void GlfwVulkanWrapper::createUniformBuffers() {
@@ -910,13 +887,61 @@ void GlfwVulkanWrapper::createUniformBuffers() {
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      uniformInfo.uniformBuffers[i], uniformInfo.uniformBuffersMemory[i]);
 
-        vkMapMemory(logicalDevice, uniformInfo.uniformBuffersMemory[i], 0, bufferSize, 0,
+        vkMapMemory(device, uniformInfo.uniformBuffersMemory[i], 0, bufferSize, 0,
                     &uniformInfo.uniformBuffersMapped[i]);
     }
 }
 
+void GlfwVulkanWrapper::createDescriptorPool() {
+    VkDescriptorPoolSize poolSize = {};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    VkDescriptorPoolCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    createInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    createInfo.poolSizeCount = 1;
+    createInfo.pPoolSizes = &poolSize;
+
+    if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("Unable to create descriptor pool!");
+    }
+}
+
+void GlfwVulkanWrapper::createDescriptorSets() {
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.pSetLayouts = layouts.data();
+
+    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = uniformInfo.uniformBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(TransformsUniform);
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = descriptorSets[i];
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+    }
+}
+
 void GlfwVulkanWrapper::createCommandBuffers() {
-    commandBuffers.resize(swapChainInfo.swapchainFramebuffers.size());
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -924,7 +949,7 @@ void GlfwVulkanWrapper::createCommandBuffers() {
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers!");
     }
 }
@@ -950,12 +975,18 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    VkBuffer vertexBuffers[] = {vertexBuffer};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdDraw(commandBuffer, vertexDataSize, 1, 0, 0);
+        VkBuffer vertexBuffers[] = {vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
+                                &descriptorSets[currentFrame], 0, nullptr);
+
+        vkCmdDraw(commandBuffer, vertexDataSize, 1, 0, 0);
+    }
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -979,55 +1010,30 @@ void GlfwVulkanWrapper::createSyncObjects() {
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Set this flag to be initialized to be on
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]) !=
-            VK_SUCCESS) {
+        if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create semaphore!");
         }
 
-        if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) !=
-            VK_SUCCESS) {
+        if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create semaphore!");
         }
 
-        if (vkCreateFence(logicalDevice, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+        if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create fence!");
         }
-    }
-}
-
-void GlfwVulkanWrapper::createDescriptorPool() {
-    VkDescriptorPoolSize poolSize = {};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(swapChainInfo.swapchainImages.size());
-
-    VkDescriptorPoolCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    createInfo.maxSets = static_cast<uint32_t>(swapChainInfo.swapchainImages.size());
-    createInfo.poolSizeCount = 1;
-    createInfo.pPoolSizes = &poolSize;
-
-    if (vkCreateDescriptorPool(logicalDevice, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("Unable to create descriptor pool!");
     }
 }
 
 // Cleanup methods.
 
 void GlfwVulkanWrapper::cleanupSwapChain() {
-    for (auto &swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
-        vkDestroyFramebuffer(logicalDevice, swapchainFramebuffer, nullptr);
+    for (auto swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
+        vkDestroyFramebuffer(device, swapchainFramebuffer, nullptr);
     }
 
-    vkFreeCommandBuffers(logicalDevice, commandPool, static_cast<uint32_t>(commandBuffers.size()),
-                         commandBuffers.data());
-
-    vkDestroyPipeline(logicalDevice, pipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-    vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
-
-    for (auto &swapchainImageView : swapChainInfo.swapchainImageViews) {
-        vkDestroyImageView(logicalDevice, swapchainImageView, nullptr);
+    for (auto swapchainImageView : swapChainInfo.swapchainImageViews) {
+        vkDestroyImageView(device, swapchainImageView, nullptr);
     }
 
-    vkDestroySwapchainKHR(logicalDevice, swapChainInfo.swapchain, nullptr);
+    vkDestroySwapchainKHR(device, swapChainInfo.swapchain, nullptr);
 }

@@ -75,7 +75,7 @@ private:
     // Main Vulkan entities.
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
-    VkDevice logicalDevice;
+    VkDevice device;
 
     QueueFamilyIndices queueIndices;
     VkQueue graphicsQueue;
@@ -85,7 +85,10 @@ private:
     SwapChainInfo swapChainInfo;
     VkRenderPass renderPass;
 
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
     VkDescriptorSetLayout descriptorSetLayout;
+
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
 
@@ -105,8 +108,6 @@ private:
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> imagesInFlight;
-
-    VkDescriptorPool descriptorPool;
 
     using DeinitCallback = void(VkDevice);
     using DrawCallback = VkCommandBuffer(uint32_t, const VkExtent2D &);
@@ -147,7 +148,7 @@ public:
         return imageCount;
     }
     VkDevice getLogicalDevice() {
-        return logicalDevice;
+        return device;
     }
     const SwapChainInfo &getSwapchainInfo() {
         return swapChainInfo;
@@ -194,9 +195,10 @@ private:
     void createCommandPool();
     void createVertexBuffer(const std::vector<Vertex> &vertexData);
     void createUniformBuffers();
+    void createDescriptorPool();
+    void createDescriptorSets();
     void createCommandBuffers();
     void createSyncObjects();
-    void createDescriptorPool();
 
     // Cleanup methods.
     void cleanupSwapChain();
