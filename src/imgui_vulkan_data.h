@@ -14,7 +14,7 @@ struct ImGuiVulkanData {
     VkRenderPass uiRenderPass;
     VkDescriptorPool uiDescriptorPool;
 
-    VkCommandBuffer recordCommands(uint32_t bufferIdx, const VkExtent2D &swapchainExtent);
+    VkCommandBuffer recordDrawCommands(uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent);
 
     void deinit(VkDevice logicalDevice);
 };

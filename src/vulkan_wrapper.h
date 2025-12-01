@@ -14,7 +14,7 @@
 #include <vector>
 
 // A first version of abstracting over the Vulkan interface as a component
-// in the larger application. As the name suggests, this version is for
+// in the larger application. As the name suggests, this version includes
 // integration with resources provided by the GLFW framework.
 
 // Data structs.
@@ -110,7 +110,7 @@ private:
     std::vector<VkFence> imagesInFlight;
 
     using DeinitCallback = void(VkDevice);
-    using DrawCallback = VkCommandBuffer(uint32_t, const VkExtent2D &);
+    using DrawCallback = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
 
     // UI callbacks for dependency injection.
     std::function<DeinitCallback> uiDeinitCallback;

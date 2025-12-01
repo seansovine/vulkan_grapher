@@ -5,3 +5,5 @@ cmake-build-debug/
 build/
 .vscode/
 .cache/
+
+/scratch/

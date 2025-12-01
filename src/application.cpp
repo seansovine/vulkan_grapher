@@ -2,6 +2,7 @@
 
 #include "vertex.h"
 
+#include <cstdint>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
@@ -35,14 +36,15 @@ Application::Application()
 Application::~Application() {
     std::cout << "Cleaning up" << std::endl;
 
-    // Cleanup DearImGui
+    // Cleanup DearImGui.
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
+    // Cleanup Vulkan.
     vulkan.deinit();
 
-    // Cleanup GLFW
+    // Cleanup GLFW.
     glfwDestroyWindow(window);
     glfwTerminate();
 }
@@ -54,14 +56,12 @@ void Application::initUI() {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
-    // Initialize some DearImgui specific resources
     createUIDescriptorPool();
     createUIRenderPass();
     createUICommandPool(&imGuiVulkan.uiCommandPool, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     createUICommandBuffers();
     createUIFramebuffers();
 
-    // Provide bind points from Vulkan API
     ImGui_ImplGlfw_InitForVulkan(window, true);
     ImGui_ImplVulkan_InitInfo init_info = vulkan.imGuiInitInfo(imGuiVulkan.uiDescriptorPool, imGuiVulkan.uiRenderPass);
     ImGui_ImplVulkan_Init(&init_info);
@@ -70,9 +70,10 @@ void Application::initUI() {
     vulkan.setUiDeinitCallback([this](VkDevice logicalDevice) {
         imGuiVulkan.deinit(logicalDevice); //
     });
-    vulkan.setUiDrawCallback([this](uint32_t bufferIdx, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
-        return imGuiVulkan.recordCommands(bufferIdx, swapchainExtent);
-    });
+    vulkan.setUiDrawCallback(
+        [this](uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
+            return imGuiVulkan.recordDrawCommands(currentFrame, imageIndex, swapchainExtent);
+        });
 }
 
 void Application::initVulkan() {
@@ -84,13 +85,12 @@ void Application::initWindow() {
         throw std::runtime_error("Unable to initialize GLFW!");
     }
 
-    // Do not load OpenGL and make window not resizable
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
     glfwSetKeyCallback(window, keyCallback);
 
-    // Add a pointer that allows GLFW to reference our instance
+    // Have GLFW store a pointer to this class instance for use in callbacks.
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
@@ -100,12 +100,11 @@ void Application::initWindow() {
     }
 }
 
-// If swapchain is invalidated, as during window resize, recreate it.
 void Application::recreateSwapchain() {
     vulkan.recreateSwapchain(window);
-    cleanupUIResources();
 
-    // We also need to take care of the UI.
+    // TODO: This may be currently broken.
+    cleanupUIResources();
     ImGui_ImplVulkan_SetMinImageCount(vulkan.getImageCount());
     createUICommandBuffers();
     createUIFramebuffers();
@@ -120,7 +119,6 @@ void Application::run() {
         drawFrame();
     }
 
-    // Wait for unfinished work on GPU before ending application.
     vulkan.waitForDeviceIdle();
 }
 
@@ -134,6 +132,7 @@ void Application::drawUI() {
     ImGui::Begin("Renderer Options");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
+
     // Add some vertical space.
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
     if (ImGui::Button("Toggle Vertex Colors")) {
@@ -224,7 +223,6 @@ void Application::createUIDescriptorPool() {
 }
 
 void Application::createUIFramebuffers() {
-    // Create some UI framebuffers. These will be used in the render pass for the UI
     imGuiVulkan.uiFramebuffers.resize(vulkan.getSwapchainInfo().swapchainImages.size());
     VkImageView attachment[1];
 
@@ -247,40 +245,44 @@ void Application::createUIFramebuffers() {
 }
 
 void Application::createUIRenderPass() {
-    // Create an attachment description for the render pass
     VkAttachmentDescription attachmentDescription = {};
     attachmentDescription.format = vulkan.getSwapchainInfo().swapchainImageFormat;
     attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // Need UI to be drawn on top of main
+    // UI is drawn on top of existing image.
+    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Last pass so we want to present after
+    // After the UI pass the images should be ready to present.
+    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-    // Create a color attachment reference
     VkAttachmentReference attachmentReference = {};
     attachmentReference.attachment = 0;
     attachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    // Create a subpass
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &attachmentReference;
 
-    // Create a subpass dependency to synchronize our main and UI render passes
-    // We want to render the UI after the geometry has been written to the framebuffer
-    // so we need to configure a subpass dependency as such
+    // Make the UI render pass dependent on the main renderpass.
+    // The docs say about VK_SUBPASS_EXTERNAL:
+    //
+    //   If srcSubpass is equal to VK_SUBPASS_EXTERNAL, the first synchronization
+    //   scope includes commands that occur earlier in submission order than the
+    //   vkCmdBeginRenderPass used to begin the render pass instance.
+    //
+    // https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VkSubpassDependency
+
     VkSubpassDependency subpassDependency = {};
-    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL; // Create external dependency
-    subpassDependency.dstSubpass = 0;                   // The geometry subpass comes first
+    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependency.dstSubpass = 0;
     subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    subpassDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Wait on writes
+    subpassDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     subpassDependency.dstStageMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    // Finally create the UI render pass
     VkRenderPassCreateInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
