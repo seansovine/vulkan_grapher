@@ -7,6 +7,7 @@
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include "app_state.h"
 #include "vertex.h"
 
 #include <cstdint>
@@ -19,12 +20,19 @@
 
 // Data structs.
 
+struct SwapchainConfig {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> surfaceFormats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
+
 struct SwapChainInfo {
     VkSwapchainKHR swapchain;
-    std::vector<VkImage> swapchainImages;
-    std::vector<VkImageView> swapchainImageViews;
     VkExtent2D swapChainExtent;
     VkFormat swapchainImageFormat;
+
+    std::vector<VkImage> swapchainImages;
+    std::vector<VkImageView> swapchainImageViews;
     std::vector<VkFramebuffer> swapchainFramebuffers;
 };
 
@@ -32,12 +40,6 @@ struct QueueFamilyIndices {
     uint32_t graphicsFamilyIndex;
     uint32_t computeFamilyIndex;
     uint32_t presentFamilyIndex;
-};
-
-struct SwapchainConfig {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> surfaceFormats;
-    std::vector<VkPresentModeKHR> presentModes;
 };
 
 struct DebugInfo {
@@ -74,6 +76,7 @@ class GlfwVulkanWrapper {
 private:
     // Main Vulkan entities.
     VkInstance instance;
+    VkSurfaceKHR surface;
     VkPhysicalDevice physicalDevice;
     VkDevice device;
 
@@ -81,13 +84,12 @@ private:
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    VkSurfaceKHR surface;
     SwapChainInfo swapChainInfo;
     VkRenderPass renderPass;
 
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
     VkDescriptorSetLayout descriptorSetLayout;
+    std::vector<VkDescriptorSet> descriptorSets;
 
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
@@ -138,7 +140,7 @@ public:
     void deinit();
 
     // Rendering functions.
-    void drawFrame(GLFWwindow *window, bool frameBufferResized);
+    void drawFrame(GLFWwindow *window, const AppState &appState, bool frameBufferResized);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void updateUniformBuffer(uint32_t currentImage);
     void updateMesh(const std::vector<Vertex> &vertexData);
@@ -167,9 +169,10 @@ private:
     VkShaderModule createShaderModule(const std::vector<char> &shaderCode);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-    // Buffer creation helper.
+    // Buffer management helpers.
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer,
                       VkDeviceMemory &bufferMemory);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
     // Swap chain creation helpers.
     VkExtent2D pickSwapchainExtent(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);

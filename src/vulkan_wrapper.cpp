@@ -112,7 +112,7 @@ void GlfwVulkanWrapper::deinit() {
 
 // Rendering functions.
 
-void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
+void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, const AppState &appState, bool frameBufferResized) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -126,9 +126,11 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    updateUniformBuffer(currentFrame);
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+    if (appState.rotating) {
+        updateUniformBuffer(currentFrame);
+    }
 
+    vkResetFences(device, 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
@@ -306,7 +308,7 @@ uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryProperty
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-// Buffer creation helper.
+// Buffer management helpers.
 
 void GlfwVulkanWrapper::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                                      VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
@@ -333,6 +335,40 @@ void GlfwVulkanWrapper::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage
     }
 
     vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+void GlfwVulkanWrapper::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue);
+
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
 // Swap chain creation helpers.
@@ -828,15 +864,24 @@ void GlfwVulkanWrapper::createCommandPool() {
 void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
     VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
 
-    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexBuffer,
-                 vertexBufferMemory);
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                 stagingBufferMemory);
 
-    // TODO: Switch to using staging buffer so we can use on-device memory.
     void *data;
-    vkMapMemory(device, vertexBufferMemory, 0, bufferSize, 0, &data);
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, vertexData.data(), (size_t)bufferSize);
-    vkUnmapMemory(device, vertexBufferMemory);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
 void GlfwVulkanWrapper::createUniformBuffers() {

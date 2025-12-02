@@ -77,7 +77,7 @@ void Application::initUI() {
 }
 
 void Application::initVulkan() {
-    vulkan.init(window, WINDOW_WIDTH, WINDOW_HEIGHT, vertexData);
+    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, vertexData);
 }
 
 void Application::initWindow() {
@@ -87,7 +87,7 @@ void Application::initWindow() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
+    window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
     glfwSetKeyCallback(window, keyCallback);
 
     // Have GLFW store a pointer to this class instance for use in callbacks.
@@ -135,8 +135,8 @@ void Application::drawUI() {
 
     // Add some vertical space.
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
-    if (ImGui::Button("Toggle Vertex Colors")) {
-        toggleMesh();
+    if (ImGui::Button("Toggle Object Rotation")) {
+        appState.rotating = !appState.rotating;
     }
 
     ImGui::End();
@@ -155,7 +155,7 @@ void Application::toggleMesh() {
 }
 
 void Application::drawFrame() {
-    vulkan.drawFrame(window, framebufferResized);
+    vulkan.drawFrame(window, appState, framebufferResized);
 }
 
 // Vulkan and ImGui helpers.

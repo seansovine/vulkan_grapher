@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "app_state.h"
 #include "imgui_vulkan_data.h"
 #include "vertex.h"
 #include "vulkan_wrapper.h"
@@ -12,6 +13,8 @@
 
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
+
+    AppState appState;
 
 public:
     Application();
@@ -29,8 +32,8 @@ private:
     void drawFrame();
     void recreateSwapchain();
 
-    // This is currently toggles between the two example vertex sets updates
-    // the vertex buffer with the new set that is chosen after toggling.
+    // Toggles between the two example vertex sets updates the
+    // vertex buffer with data from the new set after toggling.
     void toggleMesh();
 
 private:
@@ -44,8 +47,8 @@ private:
     void cleanupUIResources();
 
 private:
-    const uint32_t WINDOW_WIDTH = 1200;
-    const uint32_t WINDOW_HEIGHT = 900;
+    const uint32_t INITIAL_WINDOW_WIDTH = 1200;
+    const uint32_t INITIAL_WINDOW_HEIGHT = 900;
 
     bool framebufferResized = false;
 
