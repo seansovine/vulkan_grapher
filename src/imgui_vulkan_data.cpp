@@ -1,4 +1,5 @@
 #include "imgui_vulkan_data.h"
+#include "vulkan_wrapper.h"
 
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
@@ -52,5 +53,32 @@ void ImGuiVulkanData::deinit(VkDevice logicalDevice) {
 
     for (auto framebuffer : uiFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
+    }
+}
+
+void ImGuiVulkanData::createFrameBuffers(GlfwVulkanWrapper &vulkan) {
+    uiFramebuffers.resize(vulkan.getSwapchainInfo().swapchainImages.size());
+    VkImageView attachment[1];
+
+    VkFramebufferCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    info.renderPass = uiRenderPass;
+    info.attachmentCount = 1;
+    info.pAttachments = attachment;
+    info.width = vulkan.getSwapchainInfo().swapChainExtent.width;
+    info.height = vulkan.getSwapchainInfo().swapChainExtent.height;
+    info.layers = 1;
+
+    for (uint32_t i = 0; i < vulkan.getSwapchainInfo().swapchainImages.size(); ++i) {
+        attachment[0] = vulkan.getSwapchainInfo().swapchainImageViews[i];
+        if (vkCreateFramebuffer(vulkan.getLogicalDevice(), &info, nullptr, &uiFramebuffers[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Unable to create UI framebuffers!");
+        }
+    }
+}
+
+void ImGuiVulkanData::destroyFrameBuffers(GlfwVulkanWrapper &vulkan) {
+    for (auto framebuffer : uiFramebuffers) {
+        vkDestroyFramebuffer(vulkan.getLogicalDevice(), framebuffer, nullptr);
     }
 }

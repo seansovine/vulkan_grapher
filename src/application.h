@@ -30,7 +30,7 @@ private:
 
     void drawUI();
     void drawFrame();
-    void recreateSwapchain();
+    void recreateUISwapchain(uint32_t imageCount);
 
     // Toggles between the two example vertex sets updates the
     // vertex buffer with data from the new set after toggling.

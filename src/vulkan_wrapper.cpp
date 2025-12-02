@@ -19,8 +19,11 @@
 
 // State management functions.
 
-void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_t inWindowHeight,
+void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
                              const std::vector<Vertex> &vertexData) {
+    assert(inWindow);
+    window = inWindow;
+
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
 
@@ -28,7 +31,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_
 
     createInstance();
     setupDebugMessenger();
-    createSurface(window);
+    createSurface();
     pickPhysicalDevice();
     getDeviceQueueIndices();
     createLogicalDevice();
@@ -51,7 +54,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *window, uint32_t inWindowWidth, uint32_
     createSyncObjects();
 }
 
-void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
+void GlfwVulkanWrapper::recreateSwapchain() {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
     while (width == 0 || height == 0) {
@@ -60,6 +63,7 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     }
 
     waitForDeviceIdle();
+    destroyUIFrameBuffersCallback(*this);
     cleanupSwapChain();
 
     // TODO: This may be broken. Compare with known working examples.
@@ -67,6 +71,8 @@ void GlfwVulkanWrapper::recreateSwapchain(GLFWwindow *window) {
     createSwapchain();
     createImageViews();
     createFramebuffers();
+
+    createUIFrameBuffersCallback(*this);
 }
 
 void GlfwVulkanWrapper::waitForDeviceIdle() {
@@ -112,7 +118,7 @@ void GlfwVulkanWrapper::deinit() {
 
 // Rendering functions.
 
-void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, const AppState &appState, bool frameBufferResized) {
+void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResized) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -120,7 +126,7 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, const AppState &appState, 
                                             imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain(window);
+        recreateSwapchain();
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Unable to acquire swap chain!");
@@ -173,7 +179,7 @@ void GlfwVulkanWrapper::drawFrame(GLFWwindow *window, const AppState &appState, 
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || frameBufferResized) {
         frameBufferResized = false;
-        recreateSwapchain(window);
+        recreateSwapchain();
     } else if (result != VK_SUCCESS) {
         throw std::runtime_error("Unable to present the swap chain image!");
     }
@@ -460,7 +466,7 @@ void GlfwVulkanWrapper::setupDebugMessenger() {
     }
 }
 
-void GlfwVulkanWrapper::createSurface(GLFWwindow *window) {
+void GlfwVulkanWrapper::createSurface() {
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create window surface!");
     }

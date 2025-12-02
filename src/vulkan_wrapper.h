@@ -74,6 +74,8 @@ class GlfwVulkanWrapper {
     DebugInfo debugInfo;
 
 private:
+    GLFWwindow *window = nullptr;
+
     // Main Vulkan entities.
     VkInstance instance;
     VkSurfaceKHR surface;
@@ -111,12 +113,16 @@ private:
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> imagesInFlight;
 
-    using DeinitCallback = void(VkDevice);
-    using DrawCallback = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
+    using DeinitUICallback = void(VkDevice);
+    using DrawUICallback = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
+    using CreateUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
+    using DestroyUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
 
     // UI callbacks for dependency injection.
-    std::function<DeinitCallback> uiDeinitCallback;
-    std::function<DrawCallback> uiDrawCallback;
+    std::function<DeinitUICallback> uiDeinitCallback;
+    std::function<DrawUICallback> uiDrawCallback;
+    std::function<CreateUIFrameBuffersCallback> createUIFrameBuffersCallback;
+    std::function<DestroyUIFrameBuffersCallback> destroyUIFrameBuffersCallback;
 
 public:
     uint32_t windowWidth;
@@ -127,20 +133,26 @@ public:
     // Initialization functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const std::vector<Vertex> &vertexData);
 
-    void setUiDeinitCallback(const std::function<DeinitCallback> &inUiDeinitCallback) {
+    void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
     }
-    void setUiDrawCallback(const std::function<DrawCallback> &inUiDrawCallback) {
+    void setUIDrawCallback(const std::function<DrawUICallback> &inUiDrawCallback) {
         uiDrawCallback = inUiDrawCallback;
+    }
+    void setCreateUIFrameBuffersCallback(const std::function<CreateUIFrameBuffersCallback> &inCallback) {
+        createUIFrameBuffersCallback = inCallback;
+    }
+    void setDestroyUIFrameBuffersCallback(const std::function<DestroyUIFrameBuffersCallback> &inCallback) {
+        destroyUIFrameBuffersCallback = inCallback;
     }
 
     // State management functions.
-    void recreateSwapchain(GLFWwindow *window);
+    void recreateSwapchain();
     void waitForDeviceIdle();
     void deinit();
 
     // Rendering functions.
-    void drawFrame(GLFWwindow *window, const AppState &appState, bool frameBufferResized);
+    void drawFrame(const AppState &appState, bool frameBufferResized);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void updateUniformBuffer(uint32_t currentImage);
     void updateMesh(const std::vector<Vertex> &vertexData);
@@ -182,7 +194,7 @@ private:
     // Methods for Vulkan setup sequence.
     void createInstance();
     void setupDebugMessenger();
-    void createSurface(GLFWwindow *window);
+    void createSurface();
     void pickPhysicalDevice();
     void getDeviceQueueIndices();
     void createLogicalDevice();

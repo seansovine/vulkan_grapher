@@ -3,6 +3,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "vulkan_wrapper.h"
+
 #include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -17,6 +19,10 @@ struct ImGuiVulkanData {
     VkCommandBuffer recordDrawCommands(uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent);
 
     void deinit(VkDevice logicalDevice);
+
+    void createFrameBuffers(GlfwVulkanWrapper &vulkan);
+
+    void destroyFrameBuffers(GlfwVulkanWrapper &vulkan);
 };
 
 #endif // IMGUI_VULKAN_DATA_H_

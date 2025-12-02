@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include "vertex.h"
+#include "vulkan_wrapper.h"
 
 #include <cstdint>
 #include <imgui/backends/imgui_impl_glfw.h>
@@ -67,13 +68,17 @@ void Application::initUI() {
     ImGui_ImplVulkan_Init(&init_info);
 
     // Set ui callbacks on Vulkan wrapper.
-    vulkan.setUiDeinitCallback([this](VkDevice logicalDevice) {
+    vulkan.setUIDeinitCallback([this](VkDevice logicalDevice) {
         imGuiVulkan.deinit(logicalDevice); //
     });
-    vulkan.setUiDrawCallback(
+    vulkan.setUIDrawCallback(
         [this](uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
             return imGuiVulkan.recordDrawCommands(currentFrame, imageIndex, swapchainExtent);
         });
+    vulkan.setCreateUIFrameBuffersCallback(
+        [this](GlfwVulkanWrapper &inVulkan) { this->imGuiVulkan.createFrameBuffers(inVulkan); });
+    vulkan.setDestroyUIFrameBuffersCallback(
+        [this](GlfwVulkanWrapper &inVulkan) { this->imGuiVulkan.destroyFrameBuffers(inVulkan); });
 }
 
 void Application::initVulkan() {
@@ -100,12 +105,9 @@ void Application::initWindow() {
     }
 }
 
-void Application::recreateSwapchain() {
-    vulkan.recreateSwapchain(window);
-
-    // TODO: This may be currently broken.
+void Application::recreateUISwapchain(uint32_t imageCount) {
     cleanupUIResources();
-    ImGui_ImplVulkan_SetMinImageCount(vulkan.getImageCount());
+    ImGui_ImplVulkan_SetMinImageCount(imageCount);
     createUICommandBuffers();
     createUIFramebuffers();
 }
@@ -155,7 +157,7 @@ void Application::toggleMesh() {
 }
 
 void Application::drawFrame() {
-    vulkan.drawFrame(window, appState, framebufferResized);
+    vulkan.drawFrame(appState, framebufferResized);
 }
 
 // Vulkan and ImGui helpers.
@@ -223,25 +225,7 @@ void Application::createUIDescriptorPool() {
 }
 
 void Application::createUIFramebuffers() {
-    imGuiVulkan.uiFramebuffers.resize(vulkan.getSwapchainInfo().swapchainImages.size());
-    VkImageView attachment[1];
-
-    VkFramebufferCreateInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    info.renderPass = imGuiVulkan.uiRenderPass;
-    info.attachmentCount = 1;
-    info.pAttachments = attachment;
-    info.width = vulkan.getSwapchainInfo().swapChainExtent.width;
-    info.height = vulkan.getSwapchainInfo().swapChainExtent.height;
-    info.layers = 1;
-
-    for (uint32_t i = 0; i < vulkan.getSwapchainInfo().swapchainImages.size(); ++i) {
-        attachment[0] = vulkan.getSwapchainInfo().swapchainImageViews[i];
-        if (vkCreateFramebuffer(vulkan.getLogicalDevice(), &info, nullptr, &imGuiVulkan.uiFramebuffers[i]) !=
-            VK_SUCCESS) {
-            throw std::runtime_error("Unable to create UI framebuffers!");
-        }
-    }
+    imGuiVulkan.createFrameBuffers(vulkan);
 }
 
 void Application::createUIRenderPass() {
