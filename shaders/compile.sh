@@ -1,11 +1,12 @@
 #!/usr/bin/bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 if ! command -v glslangValidator &> /dev/null
 then
-  echo "glslangValidator is not available on your system! Make sure to install it."
-  echo "Alternatively you can use Google glslc."
+  echo "glslangValidator was not found!"
 else
   echo "Compiling shaders"
-  glslangValidator -V shader.vert
-  glslangValidator -V shader.frag
+  glslangValidator -V "$SCRIPT_DIR/shader.vert" -o "$SCRIPT_DIR/vert.spv"
+  glslangValidator -V "$SCRIPT_DIR/shader.frag" -o "$SCRIPT_DIR/frag.spv"
 fi

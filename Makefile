@@ -6,3 +6,6 @@ build: src
 
 run:
 	@build/src/renderer-app
+
+shaderc: shaders/shader.frag shaders/shader.vert
+	@shaders/compile.sh
