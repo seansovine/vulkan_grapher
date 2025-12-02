@@ -1,6 +1,7 @@
 #ifndef VERTEX_H_
 #define VERTEX_H_
 
+#include <cstdint>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -39,6 +40,13 @@ struct Vertex {
     }
 };
 
+struct IndexedMeshHolder {
+    const std::vector<Vertex> &vertices;
+    const std::vector<uint16_t> &indices;
+};
+
+// Test data for development.
+
 enum class TestVertexSet {
     TEST_VERTICES_1,
     TEST_VERTICES_2,
@@ -57,5 +65,9 @@ static const std::vector<Vertex> TEST_VERTICES_2 = {
     Vertex{{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
 };
 // clang-format on
+
+static const std::vector<uint16_t> TEST_INDICES = {
+    0, 1, 2 //
+};
 
 #endif

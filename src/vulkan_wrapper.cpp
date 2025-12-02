@@ -20,14 +20,14 @@
 // State management functions.
 
 void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             const std::vector<Vertex> &vertexData) {
+                             const IndexedMeshHolder &meshData) {
     assert(inWindow);
     window = inWindow;
 
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
 
-    vertexDataSize = static_cast<uint32_t>(vertexData.size());
+    vertexDataSize = static_cast<uint32_t>(meshData.vertices.size());
 
     createInstance();
     setupDebugMessenger();
@@ -46,7 +46,8 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createFramebuffers();
 
     createCommandPool();
-    createVertexBuffer(vertexData);
+    createVertexBuffer(meshData.vertices);
+    createIndexBuffer(meshData.indices);
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
@@ -96,6 +97,9 @@ void GlfwVulkanWrapper::deinit() {
 
     vkDestroyBuffer(device, vertexBuffer, nullptr);
     vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    vkFreeMemory(device, indexBufferMemory, nullptr);
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -875,7 +879,29 @@ void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData
                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
     copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
 
+void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint16_t> &indices) {
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    numIndices = indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                 stagingBufferMemory);
+
+    void *data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
@@ -986,11 +1012,12 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
                                 &descriptorSets[currentFrame], 0, nullptr);
 
-        vkCmdDraw(commandBuffer, vertexDataSize, 1, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(numIndices), 1, 0, 0, 0);
     }
 
     vkCmdEndRenderPass(commandBuffer);

@@ -82,7 +82,7 @@ void Application::initUI() {
 }
 
 void Application::initVulkan() {
-    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, vertexData);
+    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, IndexedMeshHolder{vertexData, TEST_INDICES});
 }
 
 void Application::initWindow() {

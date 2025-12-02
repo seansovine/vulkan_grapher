@@ -101,6 +101,9 @@ private:
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+    uint32_t numIndices;
 
     UniformInfo uniformInfo;
 
@@ -132,7 +135,7 @@ public:
 
 public:
     // Initialization functions.
-    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const std::vector<Vertex> &vertexData);
+    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const IndexedMeshHolder &meshData);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
@@ -209,6 +212,7 @@ private:
     void createFramebuffers();
     void createCommandPool();
     void createVertexBuffer(const std::vector<Vertex> &vertexData);
+    void createIndexBuffer(const std::vector<uint16_t> &indices);
     void createUniformBuffers();
     void createDescriptorPool();
     void createDescriptorSets();
