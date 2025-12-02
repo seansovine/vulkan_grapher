@@ -113,6 +113,7 @@ private:
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> imagesInFlight;
 
+private:
     using DeinitUICallback = void(VkDevice);
     using DrawUICallback = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
     using CreateUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
@@ -154,8 +155,7 @@ public:
     // Rendering functions.
     void drawFrame(const AppState &appState, bool frameBufferResized);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-    void updateUniformBuffer(uint32_t currentImage);
-    void updateMesh(const std::vector<Vertex> &vertexData);
+    void updateUniformBuffer(uint32_t currentImage, const AppState &appState);
 
 public:
     uint32_t getImageCount() {

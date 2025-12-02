@@ -66,8 +66,6 @@ void GlfwVulkanWrapper::recreateSwapchain() {
     destroyUIFrameBuffersCallback(*this);
     cleanupSwapChain();
 
-    // TODO: This may be broken. Compare with known working examples.
-
     createSwapchain();
     createImageViews();
     createFramebuffers();
@@ -132,9 +130,7 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    if (appState.rotating) {
-        updateUniformBuffer(currentFrame);
-    }
+    updateUniformBuffer(currentFrame, appState);
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
@@ -187,24 +183,18 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void GlfwVulkanWrapper::updateMesh(const std::vector<Vertex> &vertexData) {
-    size_t dataSizeBytes = sizeof(vertexData[0]) * vertexData.size();
-    assert(vertexData.size() == vertexDataSize);
-
-    void *data;
-    vkMapMemory(device, vertexBufferMemory, 0, dataSizeBytes, 0, &data);
-
-    // Our buffer was created with the HOST_COHERENT bit, so we can update it here.
-    // TODO: We will switch to using a staging buffer for vertex data transfer.
-    memcpy(data, vertexData.data(), dataSizeBytes);
-    vkUnmapMemory(device, vertexBufferMemory);
-}
-
-void GlfwVulkanWrapper::updateUniformBuffer(uint32_t currentImage) {
+void GlfwVulkanWrapper::updateUniformBuffer(uint32_t currentImage, const AppState &appState) {
     static auto startTime = std::chrono::high_resolution_clock::now();
+    static float lastTime = 0.0f;
 
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+    float time;
+    if (appState.rotating) {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+        lastTime = time;
+    } else {
+        time = lastTime;
+    }
 
     TransformsUniform ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));

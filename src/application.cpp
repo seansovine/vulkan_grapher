@@ -105,13 +105,6 @@ void Application::initWindow() {
     }
 }
 
-void Application::recreateUISwapchain(uint32_t imageCount) {
-    cleanupUIResources();
-    ImGui_ImplVulkan_SetMinImageCount(imageCount);
-    createUICommandBuffers();
-    createUIFramebuffers();
-}
-
 // Render loop methods.
 
 void Application::run() {
@@ -153,7 +146,6 @@ void Application::toggleMesh() {
         currentTestVertexSet = TestVertexSet::TEST_VERTICES_1;
         vertexData = TEST_VERTICES_1;
     }
-    vulkan.updateMesh(vertexData);
 }
 
 void Application::drawFrame() {
