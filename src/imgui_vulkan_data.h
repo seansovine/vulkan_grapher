@@ -23,6 +23,9 @@ struct ImGuiVulkanData {
     void createFrameBuffers(GlfwVulkanWrapper &vulkan);
 
     void destroyFrameBuffers(GlfwVulkanWrapper &vulkan);
+
+    // TODO: Implement this and use it, and move other UI setup here from Application.
+    void createRenderPass(GlfwVulkanWrapper &vulkan);
 };
 
 #endif // IMGUI_VULKAN_DATA_H_

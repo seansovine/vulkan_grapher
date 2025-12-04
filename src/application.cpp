@@ -222,7 +222,7 @@ void Application::createUIFramebuffers() {
 
 void Application::createUIRenderPass() {
     VkAttachmentDescription attachmentDescription = {};
-    attachmentDescription.format = vulkan.getSwapchainInfo().swapchainImageFormat;
+    attachmentDescription.format = vulkan.getSwapchainInfo().swapChainImageFormat;
     attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
     // UI is drawn on top of existing image.
     attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;

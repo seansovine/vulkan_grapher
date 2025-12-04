@@ -1,6 +1,7 @@
 #include "vulkan_wrapper.h"
 
 #include <GLFW/glfw3.h>
+#include <string>
 #include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
@@ -43,6 +44,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
+    createColorResources();
     createFramebuffers();
 
     createCommandPool();
@@ -69,6 +71,7 @@ void GlfwVulkanWrapper::recreateSwapchain() {
 
     createSwapchain();
     createImageViews();
+    createColorResources();
     createFramebuffers();
 
     createUIFrameBuffersCallback(*this);
@@ -247,8 +250,6 @@ std::vector<const char *> GlfwVulkanWrapper::getRequiredExtensions() const {
 }
 
 bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
-    VkPhysicalDeviceProperties properties;
-    vkGetPhysicalDeviceProperties(device, &properties);
     bool extensionsSupported = VulkanHelper::checkDeviceExtensions(device, debugInfo.deviceExtensions);
 
     bool swapChainAdequate = false;
@@ -257,7 +258,7 @@ bool GlfwVulkanWrapper::isDeviceSuitable(VkPhysicalDevice device) {
         swapChainAdequate = !swapchainConfig.presentModes.empty() && !swapchainConfig.surfaceFormats.empty();
     }
 
-    return swapChainAdequate && extensionsSupported && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    return swapChainAdequate && extensionsSupported;
 }
 
 SwapchainConfig GlfwVulkanWrapper::querySwapchainSupport(const VkPhysicalDevice &device) {
@@ -306,6 +307,34 @@ uint32_t GlfwVulkanWrapper::findMemoryType(uint32_t typeFilter, VkMemoryProperty
     }
 
     throw std::runtime_error("failed to find suitable memory type!");
+}
+
+VkSampleCountFlagBits GlfwVulkanWrapper::getMaxUsableSampleCount() {
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+
+    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+                                physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) {
+        return VK_SAMPLE_COUNT_64_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_32_BIT) {
+        return VK_SAMPLE_COUNT_32_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_16_BIT) {
+        return VK_SAMPLE_COUNT_16_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_8_BIT) {
+        return VK_SAMPLE_COUNT_8_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_4_BIT) {
+        return VK_SAMPLE_COUNT_4_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_2_BIT) {
+        return VK_SAMPLE_COUNT_2_BIT;
+    }
+
+    return VK_SAMPLE_COUNT_1_BIT;
 }
 
 // Buffer management helpers.
@@ -369,6 +398,46 @@ void GlfwVulkanWrapper::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDev
     vkQueueWaitIdle(graphicsQueue);
 
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+
+// Image creation helper.
+
+void GlfwVulkanWrapper::createImage(uint32_t width, uint32_t height, uint32_t mipLevels,
+                                    VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling,
+                                    VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
+                                    VkDeviceMemory &imageMemory) {
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = mipLevels;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = numSamples;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate image memory!");
+    }
+
+    vkBindImageMemory(device, image, imageMemory, 0);
 }
 
 // Swap chain creation helpers.
@@ -480,24 +549,19 @@ void GlfwVulkanWrapper::pickPhysicalDevice() {
     }
 
     for (const auto &device : physicalDevices) {
-        VkPhysicalDeviceProperties properties;
-        vkGetPhysicalDeviceProperties(device, &properties);
-
         if (isDeviceSuitable(device)) {
+            VkPhysicalDeviceProperties properties;
+            vkGetPhysicalDeviceProperties(device, &properties);
             std::cout << "Using discrete GPU: " << properties.deviceName << std::endl;
             physicalDevice = device;
+            msaaSamples = getMaxUsableSampleCount();
+            break;
         }
     }
 
-    VkPhysicalDeviceProperties properties;
-    vkGetPhysicalDeviceProperties(physicalDevices[0], &properties);
-
-    if (properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
-        throw std::runtime_error("Did not find a physical GPU on this system!");
+    if (physicalDevice == VK_NULL_HANDLE) {
+        throw std::runtime_error("Failed to find a suitable GPU!");
     }
-
-    std::cout << "Using fallback physical device: " << properties.deviceName << std::endl;
-    physicalDevice = physicalDevices[0];
 }
 
 void GlfwVulkanWrapper::getDeviceQueueIndices() {
@@ -608,7 +672,7 @@ void GlfwVulkanWrapper::createSwapchain() {
         throw std::runtime_error("Unable to create swap chain!");
     }
 
-    swapChainInfo.swapchainImageFormat = surfaceFormat.format;
+    swapChainInfo.swapChainImageFormat = surfaceFormat.format;
     swapChainInfo.swapChainExtent = extent;
 
     uint32_t swapchainCount;
@@ -617,34 +681,39 @@ void GlfwVulkanWrapper::createSwapchain() {
     vkGetSwapchainImagesKHR(device, swapChainInfo.swapchain, &swapchainCount, swapChainInfo.swapchainImages.data());
 }
 
+VkImageView GlfwVulkanWrapper::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
+                                               uint32_t mipLevels) {
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image view!");
+    }
+
+    return imageView;
+}
+
 void GlfwVulkanWrapper::createImageViews() {
     swapChainInfo.swapchainImageViews.resize(swapChainInfo.swapchainImages.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImages.size(); ++i) {
-        VkImageViewCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = swapChainInfo.swapchainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = swapChainInfo.swapchainImageFormat;
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(device, &createInfo, nullptr, &swapChainInfo.swapchainImageViews[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Unable to create image views!");
-        }
+        swapChainInfo.swapchainImageViews[i] = createImageView(
+            swapChainInfo.swapchainImages[i], swapChainInfo.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 }
 
 void GlfwVulkanWrapper::createRenderPass() {
     VkAttachmentDescription colorAttachment = {};
-    colorAttachment.format = swapChainInfo.swapchainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.format = swapChainInfo.swapChainImageFormat;
+    colorAttachment.samples = msaaSamples;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -652,27 +721,44 @@ void GlfwVulkanWrapper::createRenderPass() {
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription colorAttachmentResolve{};
+    colorAttachmentResolve.format = swapChainInfo.swapChainImageFormat;
+    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentReference colorAttachmentRef = {};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentResolveRef{};
+    colorAttachmentResolveRef.attachment = 1;
+    colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpassDescription = {};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1;
     subpassDescription.pColorAttachments = &colorAttachmentRef;
+    subpassDescription.pResolveAttachments = &colorAttachmentResolveRef;
 
     VkSubpassDependency dependency = {};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
     dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, colorAttachmentResolve};
 
     VkRenderPassCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    createInfo.attachmentCount = 1;
-    createInfo.pAttachments = &colorAttachment;
+    createInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    createInfo.pAttachments = attachments.data();
     createInfo.subpassCount = 1;
     createInfo.pSubpasses = &subpassDescription;
     createInfo.dependencyCount = 1;
@@ -772,7 +858,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
 
     VkPipelineMultisampleStateCreateInfo multisamplingInfo = {};
     multisamplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisamplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisamplingInfo.rasterizationSamples = msaaSamples;
     multisamplingInfo.sampleShadingEnable = VK_FALSE;
     multisamplingInfo.minSampleShading = 1.0f;
     multisamplingInfo.pSampleMask = nullptr;
@@ -832,12 +918,12 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
 void GlfwVulkanWrapper::createFramebuffers() {
     swapChainInfo.swapchainFramebuffers.resize(swapChainInfo.swapchainImageViews.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImageViews.size(); ++i) {
-        VkImageView attachments[] = {swapChainInfo.swapchainImageViews[i]};
+        VkImageView attachments[] = {colorImageView, swapChainInfo.swapchainImageViews[i]};
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.attachmentCount = 2;
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = swapChainInfo.swapChainExtent.width;
         framebufferInfo.height = swapChainInfo.swapChainExtent.height;
@@ -859,6 +945,15 @@ void GlfwVulkanWrapper::createCommandPool() {
     if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics command pool!");
     }
+}
+
+void GlfwVulkanWrapper::createColorResources() {
+    VkFormat colorFormat = swapChainInfo.swapChainImageFormat;
+
+    createImage(swapChainInfo.swapChainExtent.width, swapChainInfo.swapChainExtent.height, 1, msaaSamples, colorFormat,
+                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+    colorImageView = createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
 void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
@@ -1058,6 +1153,10 @@ void GlfwVulkanWrapper::createSyncObjects() {
 // Cleanup methods.
 
 void GlfwVulkanWrapper::cleanupSwapChain() {
+    vkDestroyImageView(device, colorImageView, nullptr);
+    vkDestroyImage(device, colorImage, nullptr);
+    vkFreeMemory(device, colorImageMemory, nullptr);
+
     for (auto swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
         vkDestroyFramebuffer(device, swapchainFramebuffer, nullptr);
     }
