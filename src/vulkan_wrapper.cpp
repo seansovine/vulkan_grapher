@@ -21,7 +21,7 @@
 // State management functions.
 
 void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             std::vector<IndexedMeshHolder> &&meshData) {
+                             std::vector<IndexedMesh> &&meshData) {
     assert(inWindow);
     window = inWindow;
 
@@ -633,17 +633,26 @@ void GlfwVulkanWrapper::createLogicalDevice() {
         queueCreateInfos.push_back(queueInfo);
     }
 
+    VkPhysicalDeviceFeatures2 features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = nullptr,
+    };
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
+
+    if (!features.features.fillModeNonSolid) {
+        throw std::runtime_error("Device does not support wireframe rendering!");
+    }
+
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = &features;
 
     deviceInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
 
     deviceInfo.enabledExtensionCount = static_cast<uint32_t>(debugInfo.deviceExtensions.size());
     deviceInfo.ppEnabledExtensionNames = debugInfo.deviceExtensions.data();
-
-    VkPhysicalDeviceFeatures physicalDeviceFeatures = {};
-    deviceInfo.pEnabledFeatures = &physicalDeviceFeatures;
+    deviceInfo.pEnabledFeatures = nullptr;
 
     if (debugInfo.enableValidationLayers) {
         deviceInfo.enabledLayerCount = debugInfo.validationLayers.size();
@@ -787,7 +796,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMeshHolder &mesh) {
+void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMesh &mesh) {
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorCount = 1;
@@ -865,7 +874,6 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizerInfo.depthClampEnable = VK_FALSE;
     rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizerInfo.lineWidth = 1.0f;
@@ -873,6 +881,9 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     rasterizerInfo.depthBiasConstantFactor = 0.0f;
     rasterizerInfo.depthBiasClamp = 0.0f;
     rasterizerInfo.depthBiasSlopeFactor = 0.0f;
+
+    // Render wireframe until we have lighting implemented.
+    rasterizerInfo.polygonMode = VK_POLYGON_MODE_LINE;
 
     VkPipelineMultisampleStateCreateInfo multisamplingInfo = {};
     multisamplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1064,7 +1075,7 @@ void GlfwVulkanWrapper::createUniformBuffers(UniformInfo &uniformInfo) {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorPool(IndexedMeshHolder &mesh) {
+void GlfwVulkanWrapper::createDescriptorPool(IndexedMesh &mesh) {
     VkDescriptorPoolSize poolSize = {};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -1080,7 +1091,7 @@ void GlfwVulkanWrapper::createDescriptorPool(IndexedMeshHolder &mesh) {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorSets(IndexedMeshHolder &mesh) {
+void GlfwVulkanWrapper::createDescriptorSets(IndexedMesh &mesh) {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, mesh.descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

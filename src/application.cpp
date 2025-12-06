@@ -1,5 +1,6 @@
 #include "application.h"
 
+#include "function_mesh.h"
 #include "vertex.h"
 #include "vulkan_wrapper.h"
 
@@ -8,8 +9,10 @@
 #include <imgui/imgui.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <string>
 #include <vector>
 
 // GLFW callbacks.
@@ -81,8 +84,32 @@ void Application::initUI() {
 }
 
 void Application::initVulkan() {
-    std::vector<IndexedMeshHolder> meshesToRender = {IndexedMeshHolder{TEST_VERTICES_1, TEST_INDICES},
-                                                     IndexedMeshHolder{TEST_VERTICES_2, TEST_INDICES}};
+    static constexpr bool RENDER_FUNCTION = true;
+
+    std::vector<IndexedMesh> meshesToRender;
+    if (RENDER_FUNCTION) {
+        static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
+            return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
+        };
+        static auto sinc = [](double x, double y) -> double {
+            double mag = 100 * std::sqrt(x * x + y * y);
+            return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
+        };
+        static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
+            return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
+        };
+
+        FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
+        std::cout << "Building function mesh." << std::endl;
+        std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
+        std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
+        meshesToRender = {IndexedMesh{mesh.functionVertices(), mesh.meshIndices()},
+                          IndexedMesh{mesh.floorVertices(), mesh.meshIndices()}};
+
+    } else {
+        meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
+    }
+
     vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, std::move(meshesToRender));
 }
 

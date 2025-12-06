@@ -54,7 +54,7 @@ private:
     std::vector<VkCommandBuffer> commandBuffers;
 
     // TODO: Make this a vector.
-    std::vector<IndexedMeshHolder> currentMeshes;
+    std::vector<IndexedMesh> currentMeshes;
 
     uint32_t imageCount = 0;
     uint32_t currentFrame = 0;
@@ -83,8 +83,7 @@ public:
 
 public:
     // Initialization functions.
-    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight,
-              std::vector<IndexedMeshHolder> &&meshData);
+    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::vector<IndexedMesh> &&meshData);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
@@ -177,9 +176,9 @@ private:
                            VkDeviceMemory &indexBufferMemory);
     void createUniformBuffers(UniformInfo &uniformInfo);
 
-    void createDescriptorSetLayout(IndexedMeshHolder &mesh);
-    void createDescriptorPool(IndexedMeshHolder &mesh);
-    void createDescriptorSets(IndexedMeshHolder &mesh);
+    void createDescriptorSetLayout(IndexedMesh &mesh);
+    void createDescriptorPool(IndexedMesh &mesh);
+    void createDescriptorSets(IndexedMesh &mesh);
 
     void createCommandBuffers();
     void createSyncObjects();

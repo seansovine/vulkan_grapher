@@ -1,13 +1,13 @@
 add_subdirectory(imgui)
 
+add_subdirectory(vulkan)
+add_subdirectory(mesh)
+add_subdirectory(dev)
+
 SET(HEADERS
 	application.h
 	shaderloader.h
 	imgui_vulkan_data.h
-	uniforms.h
-	vertex.h
-	vulkan_debug.h
-	vulkan_helper.h
 	vulkan_wrapper.h
 )
 
@@ -25,4 +25,5 @@ target_link_libraries(renderer-app
 	Vulkan::Vulkan
 	imgui-renderer
 	glm::glm
+	mesh
 )

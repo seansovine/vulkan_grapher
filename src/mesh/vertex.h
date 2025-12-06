@@ -4,6 +4,8 @@
 #include "uniforms.h"
 #include "vulkan_objects.h"
 
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
@@ -45,7 +47,7 @@ struct Vertex {
     }
 };
 
-struct IndexedMeshHolder {
+struct IndexedMesh {
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
 
@@ -74,9 +76,15 @@ struct IndexedMeshHolder {
             time = lastTime;
         }
 
+        static constexpr float ROTATION_RADS_PER_SEC = 22.5f;
+        static constexpr float DIST_COMP = 1.5f;
+
         TransformsUniform ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.model =
+            glm::rotate(glm::mat4(1.0f), time * glm::radians(ROTATION_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.5f, -0.5f});
+        ubo.view = glm::lookAt(glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP), glm::vec3(0.0f, 0.0f, 0.0f),
+                               glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
