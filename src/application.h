@@ -5,11 +5,9 @@
 
 #include "app_state.h"
 #include "imgui_vulkan_data.h"
-#include "vertex.h"
 #include "vulkan_wrapper.h"
 
 #include <cstring>
-#include <vector>
 
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);

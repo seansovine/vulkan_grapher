@@ -3,15 +3,14 @@
 #include "vertex.h"
 #include "vulkan_wrapper.h"
 
-#include <algorithm>
-#include <cstdint>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
+#include <vulkan/vulkan_core.h>
 
+#include <cstdint>
 #include <iostream>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
 // GLFW callbacks.
 

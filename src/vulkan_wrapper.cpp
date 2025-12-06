@@ -1,8 +1,6 @@
 #include "vulkan_wrapper.h"
-#include "vertex.h"
 
 #include <GLFW/glfw3.h>
-#include <string>
 #include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
@@ -11,12 +9,14 @@
 
 #include "shaderloader.h"
 #include "uniforms.h"
+#include "vertex.h"
 #include "vulkan_debug.h"
 #include "vulkan_helper.h"
 
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <string>
 
 // State management functions.
 

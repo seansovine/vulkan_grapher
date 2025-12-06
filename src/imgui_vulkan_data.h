@@ -1,13 +1,13 @@
 #ifndef IMGUI_VULKAN_DATA_H_
 #define IMGUI_VULKAN_DATA_H_
 
-#include <vulkan/vulkan.h>
-
 #include "vulkan_wrapper.h"
+
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
 struct ImGuiVulkanData {
     VkCommandPool uiCommandPool;
