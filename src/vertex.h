@@ -1,17 +1,22 @@
 #ifndef VERTEX_H_
 #define VERTEX_H_
 
-#include <cstdint>
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "uniforms.h"
+#include "vulkan_objects.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <vulkan/vulkan.h>
 
 #include <array>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
 
     static VkVertexInputBindingDescription getBindingDescription() {
@@ -28,7 +33,7 @@ struct Vertex {
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
         attributeDescriptions[1].binding = 0;
@@ -41,8 +46,55 @@ struct Vertex {
 };
 
 struct IndexedMeshHolder {
-    const std::vector<Vertex> &vertices;
-    const std::vector<uint16_t> &indices;
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
+
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+    uint32_t numIndices;
+
+    UniformInfo uniformInfo;
+
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSetLayout descriptorSetLayout;
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    void updateUniformBuffer(uint32_t currentImage, bool rotating, float aspectRatio) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        static float lastTime = 0.0f;
+
+        float time;
+        if (rotating) {
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+            lastTime = time;
+        } else {
+            time = lastTime;
+        }
+
+        TransformsUniform ubo{};
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+        ubo.proj[1][1] *= -1;
+
+        memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    }
+
+    void destroyResources(VkDevice device) {
+        uniformInfo.destroy(device);
+
+        vkDestroyBuffer(device, vertexBuffer, nullptr);
+        vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+        vkDestroyBuffer(device, indexBuffer, nullptr);
+        vkFreeMemory(device, indexBufferMemory, nullptr);
+
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    }
 };
 
 // Test data for development.
@@ -54,15 +106,15 @@ enum class TestVertexSet {
 
 // clang-format off
 static const std::vector<Vertex> TEST_VERTICES_1 = {
-    Vertex{{ 0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}}, //
-    Vertex{{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, //
-    Vertex{{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
+    Vertex{{ 0.0f, -0.5f, -0.25f}, {1.0f, 0.0f, 0.0f}}, //
+    Vertex{{ 0.5f,  0.5f, -0.25f}, {0.0f, 1.0f, 0.0f}}, //
+    Vertex{{-0.5f,  0.5f, -0.25f}, {0.0f, 0.0f, 1.0f}}  //
 };
 
 static const std::vector<Vertex> TEST_VERTICES_2 = {
-    Vertex{{ 0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}}, //
-    Vertex{{ 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, //
-    Vertex{{-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}  //
+    Vertex{{ 0.0f, -0.5f, 0.25f}, {1.0f, 1.0f, 1.0f}}, //
+    Vertex{{ 0.5f,  0.5f, 0.25f}, {0.0f, 1.0f, 0.0f}}, //
+    Vertex{{-0.5f,  0.5f, 0.25f}, {0.0f, 0.0f, 1.0f}}  //
 };
 // clang-format on
 

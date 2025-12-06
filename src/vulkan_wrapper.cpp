@@ -1,4 +1,5 @@
 #include "vulkan_wrapper.h"
+#include "vertex.h"
 
 #include <GLFW/glfw3.h>
 #include <string>
@@ -14,21 +15,20 @@
 #include "vulkan_helper.h"
 
 #include <cassert>
-#include <chrono>
 #include <cstdint>
 #include <iostream>
 
 // State management functions.
 
 void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             const IndexedMeshHolder &meshData) {
+                             std::vector<IndexedMeshHolder> &&meshData) {
     assert(inWindow);
     window = inWindow;
 
     windowWidth = inWindowWidth;
     windowHeight = inWindowHeight;
 
-    vertexDataSize = static_cast<uint32_t>(meshData.vertices.size());
+    currentMeshes = meshData;
 
     createInstance();
     setupDebugMessenger();
@@ -42,18 +42,25 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createSwapchain();
     createImageViews();
     createRenderPass();
-    createDescriptorSetLayout();
+    for (auto &mesh : currentMeshes) {
+        createDescriptorSetLayout(mesh);
+    }
     createGraphicsPipeline();
     createColorResources();
     createDepthResources();
     createFramebuffers();
 
     createCommandPool();
-    createVertexBuffer(meshData.vertices);
-    createIndexBuffer(meshData.indices);
-    createUniformBuffers();
-    createDescriptorPool();
-    createDescriptorSets();
+    for (auto &mesh : currentMeshes) {
+        createVertexBuffer(mesh.vertices, mesh.vertexBuffer, mesh.vertexBufferMemory);
+        assert(mesh.vertexBuffer != VK_NULL_HANDLE);
+        createIndexBuffer(mesh.indices, mesh.indexBuffer, mesh.indexBufferMemory);
+        assert(mesh.indexBuffer != VK_NULL_HANDLE);
+
+        createUniformBuffers(mesh.uniformInfo);
+        createDescriptorPool(mesh);
+        createDescriptorSets(mesh);
+    }
     createCommandBuffers();
     createSyncObjects();
 }
@@ -65,6 +72,8 @@ void GlfwVulkanWrapper::recreateSwapchain() {
         glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
     }
+    windowWidth = width;
+    windowHeight = height;
 
     waitForDeviceIdle();
     destroyUIFrameBuffersCallback(*this);
@@ -75,7 +84,6 @@ void GlfwVulkanWrapper::recreateSwapchain() {
     createColorResources();
     createDepthResources();
     createFramebuffers();
-
     createUIFrameBuffersCallback(*this);
 }
 
@@ -92,19 +100,9 @@ void GlfwVulkanWrapper::deinit() {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device, uniformInfo.uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformInfo.uniformBuffersMemory[i], nullptr);
+    for (auto &mesh : currentMeshes) {
+        mesh.destroyResources(device);
     }
-
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-    vkFreeMemory(device, vertexBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, indexBuffer, nullptr);
-    vkFreeMemory(device, indexBufferMemory, nullptr);
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -139,7 +137,10 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    updateUniformBuffer(currentFrame, appState);
+    for (auto &mesh : currentMeshes) {
+        mesh.updateUniformBuffer(currentFrame, appState.rotating,
+                                 swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height);
+    }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
@@ -183,37 +184,13 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || frameBufferResized) {
-        frameBufferResized = false;
         recreateSwapchain();
+        frameBufferResized = false;
     } else if (result != VK_SUCCESS) {
         throw std::runtime_error("Unable to present the swap chain image!");
     }
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-}
-
-void GlfwVulkanWrapper::updateUniformBuffer(uint32_t currentImage, const AppState &appState) {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    static float lastTime = 0.0f;
-
-    float time;
-    if (appState.rotating) {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-        lastTime = time;
-    } else {
-        time = lastTime;
-    }
-
-    TransformsUniform ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f),
-                                swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f,
-                                10.0f);
-    ubo.proj[1][1] *= -1;
-
-    memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
 // Misc. helpers used by initialization.
@@ -448,7 +425,10 @@ VkExtent2D GlfwVulkanWrapper::pickSwapchainExtent(const VkSurfaceCapabilitiesKHR
     if (surfaceCapabilities.currentExtent.width != UINT32_MAX) {
         return surfaceCapabilities.currentExtent;
     } else {
-        VkExtent2D actualExtent = {windowWidth, windowHeight};
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+
+        VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
         actualExtent.width = std::max(surfaceCapabilities.minImageExtent.width,
                                       std::min(surfaceCapabilities.maxImageExtent.width, actualExtent.width));
         actualExtent.height = std::max(surfaceCapabilities.minImageExtent.height,
@@ -807,7 +787,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorSetLayout() {
+void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMeshHolder &mesh) {
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorCount = 1;
@@ -820,7 +800,7 @@ void GlfwVulkanWrapper::createDescriptorSetLayout() {
     layoutInfo.bindingCount = 1;
     layoutInfo.pBindings = &uboLayoutBinding;
 
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &mesh.descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
@@ -934,7 +914,13 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pSetLayouts = &currentMeshes[0].descriptorSetLayout;
+
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline layout!");
@@ -951,7 +937,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.pMultisampleState = &multisamplingInfo;
     pipelineInfo.pDepthStencilState = &depthStencilInfo;
     pipelineInfo.pColorBlendState = &colorBlendingInfo;
-    pipelineInfo.pDynamicState = nullptr;
+    pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
@@ -1015,7 +1001,8 @@ void GlfwVulkanWrapper::createDepthResources() {
     depthImageInfo.imageView = createImageView(depthImageInfo.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 }
 
-void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
+void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData, VkBuffer &vertexBuffer,
+                                           VkDeviceMemory &vertexBufferMemory) {
     VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
 
     VkBuffer stagingBuffer;
@@ -1037,9 +1024,9 @@ void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint16_t> &indices) {
+void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint16_t> &indices, VkBuffer &indexBuffer,
+                                          VkDeviceMemory &indexBufferMemory) {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-    numIndices = indices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1060,7 +1047,7 @@ void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint16_t> &indices) 
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void GlfwVulkanWrapper::createUniformBuffers() {
+void GlfwVulkanWrapper::createUniformBuffers(UniformInfo &uniformInfo) {
     VkDeviceSize bufferSize = sizeof(TransformsUniform);
 
     uniformInfo.uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1077,7 +1064,7 @@ void GlfwVulkanWrapper::createUniformBuffers() {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorPool() {
+void GlfwVulkanWrapper::createDescriptorPool(IndexedMeshHolder &mesh) {
     VkDescriptorPoolSize poolSize = {};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -1088,33 +1075,33 @@ void GlfwVulkanWrapper::createDescriptorPool() {
     createInfo.poolSizeCount = 1;
     createInfo.pPoolSizes = &poolSize;
 
-    if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(device, &createInfo, nullptr, &mesh.descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create descriptor pool!");
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+void GlfwVulkanWrapper::createDescriptorSets(IndexedMeshHolder &mesh) {
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, mesh.descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorPool = mesh.descriptorPool;
     allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     allocInfo.pSetLayouts = layouts.data();
 
-    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+    mesh.descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    if (vkAllocateDescriptorSets(device, &allocInfo, mesh.descriptorSets.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate descriptor sets!");
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformInfo.uniformBuffers[i];
+        bufferInfo.buffer = currentMeshes[0].uniformInfo.uniformBuffers[i];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(TransformsUniform);
 
         VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = descriptorSets[i];
+        descriptorWrite.dstSet = mesh.descriptorSets[i];
         descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = 0;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1166,15 +1153,31 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
     {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        VkBuffer vertexBuffers[] = {vertexBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)swapChainInfo.swapChainExtent.width;
+        viewport.height = (float)swapChainInfo.swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
-                                &descriptorSets[currentFrame], 0, nullptr);
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = swapChainInfo.swapChainExtent;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(numIndices), 1, 0, 0, 0);
+        for (const auto &mesh : currentMeshes) {
+            VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
+                                    &mesh.descriptorSets[currentFrame], 0, nullptr);
+
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+        }
     }
 
     vkCmdEndRenderPass(commandBuffer);

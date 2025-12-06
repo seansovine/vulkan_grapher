@@ -18,68 +18,6 @@
 // in the larger application. As the name suggests, this version includes
 // integration with resources provided by the GLFW framework.
 
-// Data structs.
-
-struct SwapchainConfig {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> surfaceFormats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
-struct SwapChainInfo {
-    VkSwapchainKHR swapchain;
-    VkExtent2D swapChainExtent;
-    VkFormat swapChainImageFormat;
-
-    std::vector<VkImage> swapchainImages;
-    std::vector<VkImageView> swapchainImageViews;
-    std::vector<VkFramebuffer> swapchainFramebuffers;
-};
-
-struct QueueFamilyIndices {
-    uint32_t graphicsFamilyIndex;
-    uint32_t computeFamilyIndex;
-    uint32_t presentFamilyIndex;
-};
-
-struct DebugInfo {
-    // Extension information.
-    std::vector<const char *> requiredExtensions;
-    const std::vector<const char *> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME //
-    };
-    const std::vector<const char *> validationLayers = {
-        "VK_LAYER_KHRONOS_validation",
-    };
-
-    // Debug information.
-    VkDebugUtilsMessengerEXT debugMessenger;
-
-#ifdef NDEBUG
-    const bool enableValidationLayers = false;
-#else
-    const bool enableValidationLayers = true;
-#endif
-};
-
-struct UniformInfo {
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void *> uniformBuffersMapped;
-};
-
-struct ImageInfo {
-    VkImage image;
-    VkDeviceMemory imageMemory;
-    VkImageView imageView;
-
-    void destroy(VkDevice device) {
-        vkDestroyImageView(device, imageView, nullptr);
-        vkDestroyImage(device, image, nullptr);
-        vkFreeMemory(device, imageMemory, nullptr);
-    }
-};
-
 // Main interface class.
 
 class GlfwVulkanWrapper {
@@ -109,23 +47,14 @@ private:
     // Image for depth buffer;
     ImageInfo depthImageInfo;
 
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorSetLayout;
-    std::vector<VkDescriptorSet> descriptorSets;
-
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
 
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
-    uint32_t numIndices;
-
-    UniformInfo uniformInfo;
+    // TODO: Make this a vector.
+    std::vector<IndexedMeshHolder> currentMeshes;
 
     uint32_t imageCount = 0;
     uint32_t currentFrame = 0;
@@ -151,11 +80,11 @@ private:
 public:
     uint32_t windowWidth;
     uint32_t windowHeight;
-    uint32_t vertexDataSize;
 
 public:
     // Initialization functions.
-    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, const IndexedMeshHolder &meshData);
+    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight,
+              std::vector<IndexedMeshHolder> &&meshData);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
@@ -178,7 +107,6 @@ public:
     // Rendering functions.
     void drawFrame(const AppState &appState, bool frameBufferResized);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-    void updateUniformBuffer(uint32_t currentImage, const AppState &appState);
 
 public:
     uint32_t getImageCount() {
@@ -235,18 +163,24 @@ private:
     void createSwapchain();
     void createImageViews();
     void createRenderPass();
-    void createDescriptorSetLayout();
     void createGraphicsPipeline();
 
     void createFramebuffers();
     void createCommandPool();
     void createColorResources();
     void createDepthResources();
-    void createVertexBuffer(const std::vector<Vertex> &vertexData);
-    void createIndexBuffer(const std::vector<uint16_t> &indices);
-    void createUniformBuffers();
-    void createDescriptorPool();
-    void createDescriptorSets();
+
+    // Mesh buffer creation helpers.
+    void createVertexBuffer(const std::vector<Vertex> &vertexData, VkBuffer &vertexBuffer,
+                            VkDeviceMemory &vertexBufferMemory);
+    void createIndexBuffer(const std::vector<uint16_t> &indices, VkBuffer &indexBuffer,
+                           VkDeviceMemory &indexBufferMemory);
+    void createUniformBuffers(UniformInfo &uniformInfo);
+
+    void createDescriptorSetLayout(IndexedMeshHolder &mesh);
+    void createDescriptorPool(IndexedMeshHolder &mesh);
+    void createDescriptorSets(IndexedMeshHolder &mesh);
+
     void createCommandBuffers();
     void createSyncObjects();
 

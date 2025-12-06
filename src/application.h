@@ -54,7 +54,4 @@ private:
     GLFWwindow *window;
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
-
-    TestVertexSet currentTestVertexSet;
-    std::vector<Vertex> vertexData;
 };

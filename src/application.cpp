@@ -3,12 +3,14 @@
 #include "vertex.h"
 #include "vulkan_wrapper.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
 
 #include <iostream>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 // GLFW callbacks.
@@ -26,9 +28,7 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action, i
 
 // Class methods.
 
-Application::Application()
-    : currentTestVertexSet(TestVertexSet::TEST_VERTICES_1),
-      vertexData{TEST_VERTICES_1} {
+Application::Application() {
     initWindow();
     initVulkan();
     initUI();
@@ -82,7 +82,9 @@ void Application::initUI() {
 }
 
 void Application::initVulkan() {
-    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, IndexedMeshHolder{vertexData, TEST_INDICES});
+    std::vector<IndexedMeshHolder> meshesToRender = {IndexedMeshHolder{TEST_VERTICES_1, TEST_INDICES},
+                                                     IndexedMeshHolder{TEST_VERTICES_2, TEST_INDICES}};
+    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, std::move(meshesToRender));
 }
 
 void Application::initWindow() {
@@ -139,17 +141,12 @@ void Application::drawUI() {
 }
 
 void Application::toggleMesh() {
-    if (currentTestVertexSet == TestVertexSet::TEST_VERTICES_1) {
-        currentTestVertexSet = TestVertexSet::TEST_VERTICES_2;
-        vertexData = TEST_VERTICES_2;
-    } else {
-        currentTestVertexSet = TestVertexSet::TEST_VERTICES_1;
-        vertexData = TEST_VERTICES_1;
-    }
+    // TODO
 }
 
 void Application::drawFrame() {
     vulkan.drawFrame(appState, framebufferResized);
+    framebufferResized = false;
 }
 
 // Vulkan and ImGui helpers.
