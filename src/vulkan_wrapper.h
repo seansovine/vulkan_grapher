@@ -68,6 +68,18 @@ struct UniformInfo {
     std::vector<void *> uniformBuffersMapped;
 };
 
+struct ImageInfo {
+    VkImage image;
+    VkDeviceMemory imageMemory;
+    VkImageView imageView;
+
+    void destroy(VkDevice device) {
+        vkDestroyImageView(device, imageView, nullptr);
+        vkDestroyImage(device, image, nullptr);
+        vkFreeMemory(device, imageMemory, nullptr);
+    }
+};
+
 // Main interface class.
 
 class GlfwVulkanWrapper {
@@ -92,9 +104,10 @@ private:
     VkRenderPass renderPass;
 
     // Image for multisampling.
-    VkImage colorImage;
-    VkDeviceMemory colorImageMemory;
-    VkImageView colorImageView;
+    ImageInfo colorImageInfo;
+
+    // Image for depth buffer;
+    ImageInfo depthImageInfo;
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSetLayout descriptorSetLayout;
@@ -202,11 +215,13 @@ private:
     static VkPresentModeKHR pickSwapchainPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
     static VkSurfaceFormatKHR pickSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
 
-    // Image creation helper.
+    // Image creation helpers.
     void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
                      VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
                      VkImage &image, VkDeviceMemory &imageMemory);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
+
+    VkFormat findDepthFormat();
 
     // Methods for Vulkan setup sequence.
     void createInstance();
@@ -226,6 +241,7 @@ private:
     void createFramebuffers();
     void createCommandPool();
     void createColorResources();
+    void createDepthResources();
     void createVertexBuffer(const std::vector<Vertex> &vertexData);
     void createIndexBuffer(const std::vector<uint16_t> &indices);
     void createUniformBuffers();

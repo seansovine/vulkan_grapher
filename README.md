@@ -19,7 +19,7 @@ There are some basic rendering features we will include:
 
 1. ~~Staging buffers for more efficient vertex memory use.~~
 2. ~~Multi-sampling.~~
-3. Depth buffering.
+3. ~~Depth buffering.~~
 
 We will add these things next.
 

@@ -45,6 +45,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createColorResources();
+    createDepthResources();
     createFramebuffers();
 
     createCommandPool();
@@ -72,6 +73,7 @@ void GlfwVulkanWrapper::recreateSwapchain() {
     createSwapchain();
     createImageViews();
     createColorResources();
+    createDepthResources();
     createFramebuffers();
 
     createUIFrameBuffersCallback(*this);
@@ -516,6 +518,56 @@ void GlfwVulkanWrapper::createInstance() {
     }
 }
 
+VkImageView GlfwVulkanWrapper::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
+                                               uint32_t mipLevels) {
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image view!");
+    }
+
+    return imageView;
+}
+
+void GlfwVulkanWrapper::createImageViews() {
+    swapChainInfo.swapchainImageViews.resize(swapChainInfo.swapchainImages.size());
+    for (size_t i = 0; i < swapChainInfo.swapchainImages.size(); ++i) {
+        swapChainInfo.swapchainImageViews[i] = createImageView(
+            swapChainInfo.swapchainImages[i], swapChainInfo.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    }
+}
+
+VkFormat GlfwVulkanWrapper::findDepthFormat() {
+    auto findFormat = [this](const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                             VkFormatFeatureFlags features) {
+        for (VkFormat format : candidates) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+
+            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+                return format;
+            } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+                return format;
+            }
+        }
+
+        throw std::runtime_error("failed to find supported format!");
+    };
+
+    return findFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+                      VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
 void GlfwVulkanWrapper::setupDebugMessenger() {
     if (!debugInfo.enableValidationLayers) {
         return;
@@ -681,35 +733,6 @@ void GlfwVulkanWrapper::createSwapchain() {
     vkGetSwapchainImagesKHR(device, swapChainInfo.swapchain, &swapchainCount, swapChainInfo.swapchainImages.data());
 }
 
-VkImageView GlfwVulkanWrapper::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
-                                               uint32_t mipLevels) {
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create image view!");
-    }
-
-    return imageView;
-}
-
-void GlfwVulkanWrapper::createImageViews() {
-    swapChainInfo.swapchainImageViews.resize(swapChainInfo.swapchainImages.size());
-    for (size_t i = 0; i < swapChainInfo.swapchainImages.size(); ++i) {
-        swapChainInfo.swapchainImageViews[i] = createImageView(
-            swapChainInfo.swapchainImages[i], swapChainInfo.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-    }
-}
-
 void GlfwVulkanWrapper::createRenderPass() {
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapChainInfo.swapChainImageFormat;
@@ -735,8 +758,22 @@ void GlfwVulkanWrapper::createRenderPass() {
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = findDepthFormat();
+    depthAttachment.samples = msaaSamples;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkAttachmentReference colorAttachmentResolveRef{};
-    colorAttachmentResolveRef.attachment = 1;
+    colorAttachmentResolveRef.attachment = 2;
     colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpassDescription = {};
@@ -744,6 +781,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     subpassDescription.colorAttachmentCount = 1;
     subpassDescription.pColorAttachments = &colorAttachmentRef;
     subpassDescription.pResolveAttachments = &colorAttachmentResolveRef;
+    subpassDescription.pDepthStencilAttachment = &depthAttachmentRef;
 
     VkSubpassDependency dependency = {};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -753,7 +791,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, colorAttachmentResolve};
+    std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colorAttachmentResolve};
 
     VkRenderPassCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -865,21 +903,33 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     multisamplingInfo.alphaToCoverageEnable = VK_FALSE;
     multisamplingInfo.alphaToOneEnable = VK_FALSE;
 
+    VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
+    depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilInfo.depthTestEnable = VK_TRUE;
+    depthStencilInfo.depthWriteEnable = VK_TRUE;
+    depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
+    depthStencilInfo.minDepthBounds = 0.0f;
+    depthStencilInfo.maxDepthBounds = 1.0f;
+    depthStencilInfo.stencilTestEnable = VK_FALSE;
+    depthStencilInfo.front = {};
+    depthStencilInfo.back = {};
+
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
-    VkPipelineColorBlendStateCreateInfo colorBlending = {};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
+    VkPipelineColorBlendStateCreateInfo colorBlendingInfo = {};
+    colorBlendingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlendingInfo.logicOpEnable = VK_FALSE;
+    colorBlendingInfo.logicOp = VK_LOGIC_OP_COPY;
+    colorBlendingInfo.attachmentCount = 1;
+    colorBlendingInfo.pAttachments = &colorBlendAttachment;
+    colorBlendingInfo.blendConstants[0] = 0.0f;
+    colorBlendingInfo.blendConstants[1] = 0.0f;
+    colorBlendingInfo.blendConstants[2] = 0.0f;
+    colorBlendingInfo.blendConstants[3] = 0.0f;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -899,8 +949,8 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.pViewportState = &viewPortInfo;
     pipelineInfo.pRasterizationState = &rasterizerInfo;
     pipelineInfo.pMultisampleState = &multisamplingInfo;
-    pipelineInfo.pDepthStencilState = nullptr;
-    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDepthStencilState = &depthStencilInfo;
+    pipelineInfo.pColorBlendState = &colorBlendingInfo;
     pipelineInfo.pDynamicState = nullptr;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
@@ -918,13 +968,14 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
 void GlfwVulkanWrapper::createFramebuffers() {
     swapChainInfo.swapchainFramebuffers.resize(swapChainInfo.swapchainImageViews.size());
     for (size_t i = 0; i < swapChainInfo.swapchainImageViews.size(); ++i) {
-        VkImageView attachments[] = {colorImageView, swapChainInfo.swapchainImageViews[i]};
+        std::array<VkImageView, 3> attachments = {colorImageInfo.imageView, depthImageInfo.imageView,
+                                                  swapChainInfo.swapchainImageViews[i]};
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 2;
-        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
         framebufferInfo.width = swapChainInfo.swapChainExtent.width;
         framebufferInfo.height = swapChainInfo.swapChainExtent.height;
         framebufferInfo.layers = 1;
@@ -952,8 +1003,16 @@ void GlfwVulkanWrapper::createColorResources() {
 
     createImage(swapChainInfo.swapChainExtent.width, swapChainInfo.swapChainExtent.height, 1, msaaSamples, colorFormat,
                 VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
-    colorImageView = createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImageInfo.image, colorImageInfo.imageMemory);
+    colorImageInfo.imageView = createImageView(colorImageInfo.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+}
+
+void GlfwVulkanWrapper::createDepthResources() {
+    VkFormat depthFormat = findDepthFormat();
+    createImage(swapChainInfo.swapChainExtent.width, swapChainInfo.swapChainExtent.height, 1, msaaSamples, depthFormat,
+                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImageInfo.image, depthImageInfo.imageMemory);
+    depthImageInfo.imageView = createImageView(depthImageInfo.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 }
 
 void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData) {
@@ -1095,9 +1154,12 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChainInfo.swapChainExtent;
 
-    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1153,9 +1215,8 @@ void GlfwVulkanWrapper::createSyncObjects() {
 // Cleanup methods.
 
 void GlfwVulkanWrapper::cleanupSwapChain() {
-    vkDestroyImageView(device, colorImageView, nullptr);
-    vkDestroyImage(device, colorImage, nullptr);
-    vkFreeMemory(device, colorImageMemory, nullptr);
+    colorImageInfo.destroy(device);
+    depthImageInfo.destroy(device);
 
     for (auto swapchainFramebuffer : swapChainInfo.swapchainFramebuffers) {
         vkDestroyFramebuffer(device, swapchainFramebuffer, nullptr);
