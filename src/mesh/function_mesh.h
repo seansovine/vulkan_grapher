@@ -34,6 +34,7 @@ struct Square {
 
     std::vector<Square> children;
 
+    // TODO: For use in automated mesh refinement.
     bool hasChildren() {
         return !children.empty();
     }
@@ -280,7 +281,7 @@ private:
 
     // Default RGB colors for floor and function meshes.
     static constexpr glm::vec3 FLOOR_COLOR = {0.556f, 0.367f, 0.076f};
-    static constexpr glm::vec3 FUNCT_COLOR = {1.0f, 0.0f, 0.0f};
+    static constexpr glm::vec3 FUNCT_COLOR = {0.070f, 0.336f, 0.594f};
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int mNumCells = 50;

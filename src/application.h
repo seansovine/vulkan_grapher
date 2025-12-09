@@ -1,4 +1,5 @@
-#pragma once
+#ifndef APPLICATION_H_
+#define APPLICATION_H_
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -53,3 +54,5 @@ private:
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
 };
+
+#endif // APPLICATION_H_

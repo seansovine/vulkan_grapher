@@ -92,7 +92,8 @@ void Application::initVulkan() {
             return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
         };
         static auto sinc = [](double x, double y) -> double {
-            double mag = 100 * std::sqrt(x * x + y * y);
+            double scale = 50; // 100
+            double mag = scale * std::sqrt(x * x + y * y);
             return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
         };
         static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
@@ -120,7 +121,7 @@ void Application::initWindow() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Renderer", nullptr, nullptr);
+    window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Vulkan Grapher", nullptr, nullptr);
     glfwSetKeyCallback(window, keyCallback);
 
     // Have GLFW store a pointer to this class instance for use in callbacks.
@@ -152,8 +153,8 @@ void Application::drawUI() {
 
     static float f = 0.0f;
 
-    ImGui::Begin("Renderer Options");
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+    ImGui::Begin("Settings");
+    ImGui::Text("Average framerate: %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
 
     // Add some vertical space.

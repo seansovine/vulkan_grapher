@@ -82,7 +82,7 @@ struct IndexedMesh {
         TransformsUniform ubo{};
         ubo.model =
             glm::rotate(glm::mat4(1.0f), time * glm::radians(ROTATION_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.5f, -0.5f});
+        ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
         ubo.view = glm::lookAt(glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP), glm::vec3(0.0f, 0.0f, 0.0f),
                                glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
