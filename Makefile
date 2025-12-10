@@ -8,5 +8,8 @@ build: src
 run:
 	@build/src/renderer-app
 
+meshtest:
+	@build/src/dev/mesh-test
+
 shaderc: shaders/shader.frag shaders/shader.vert
 	@shaders/compile.sh

@@ -8,8 +8,11 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
+#include <limits>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <vector>
 
 // ------------------
@@ -18,6 +21,9 @@
 struct Square {
     float mTopLeft[2];
     float mBtmRight[2];
+
+    // Refinement level of this square.
+    uint8_t depth = 0;
 
     // Neighbors in same level of grid.
     // For sharing vertices via indices.
@@ -51,6 +57,10 @@ class FunctionMesh {
     using F = double (*)(double, double);
 
     static constexpr bool USE_NEW_MESH = true;
+    static constexpr bool DEBUG_REFINEMENT = true;
+
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
+    static constexpr double REFINEMENT_THRESHOLD = 0.25;
 
 public:
     explicit FunctionMesh(const F func)
@@ -85,7 +95,7 @@ public:
         return mMeshIndices;
     }
 
-    std::stringstream &debugVertex(std::stringstream &debugStrm, uint32_t vertex_i) {
+    std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint32_t vertex_i) {
         const Vertex &vertex = mFloorMeshVertices[vertex_i];
         debugStrm << "(" << vertex.pos.x << ", " << vertex.pos.z << ")";
         return debugStrm;
@@ -141,6 +151,67 @@ private:
 
                 mFloorMeshSquares.push_back(square);
             }
+        }
+    }
+
+    double funcMeshY(uint16_t index) {
+        return mFunctionMeshVertices[index].pos.y;
+    }
+
+    // Precondition: Square vertex indices are valid for function mesh.
+    bool shouldRefine(Square &square) {
+        if constexpr (DEBUG_REFINEMENT) {
+            std::cout << "Refinement check for square w/ top left corner: ";
+            debugVertex(std::cout, square.topLeftIdx) << std::endl;
+        }
+
+        if (square.depth >= MAX_REFINEMENT_DEPTH) {
+            return false;
+        }
+
+        double maxF = std::numeric_limits<double>::lowest();
+        double minF = std::numeric_limits<double>::max();
+
+        maxF = std::max(maxF, funcMeshY(square.topLeftIdx));
+        minF = std::min(minF, funcMeshY(square.topLeftIdx));
+
+        maxF = std::max(maxF, funcMeshY(square.bottomLeftIdx));
+        minF = std::min(minF, funcMeshY(square.bottomLeftIdx));
+
+        maxF = std::max(maxF, funcMeshY(square.bottomRightIdx));
+        minF = std::min(minF, funcMeshY(square.bottomRightIdx));
+
+        maxF = std::max(maxF, funcMeshY(square.topRightIdx));
+        minF = std::min(minF, funcMeshY(square.topRightIdx));
+
+        maxF = std::max(maxF, funcMeshY(square.centerIdx));
+        minF = std::min(minF, funcMeshY(square.centerIdx));
+
+        double valueRange = maxF - minF;
+        bool shouldRefine = valueRange > REFINEMENT_THRESHOLD;
+
+        if constexpr (DEBUG_REFINEMENT) {
+            std::cout << " - value range: " << std::to_string(valueRange) << std::endl;
+            if (shouldRefine) {
+                std::cout << " - Refinement should be done." << std::endl;
+            }
+        }
+
+        return shouldRefine;
+    }
+
+    void refine(Square &square) {
+        // TODO:
+        // Split into four children; recurse on children as needed.
+        // Update mesh vertices and indices as needed.
+
+        if constexpr (DEBUG_REFINEMENT) {
+            // TODO: This is just for temporary development use.
+            mFunctionMeshVertices[square.topLeftIdx].color = REFINE_DEBUG_COLOR;
+            mFunctionMeshVertices[square.topRightIdx].color = REFINE_DEBUG_COLOR;
+            mFunctionMeshVertices[square.bottomRightIdx].color = REFINE_DEBUG_COLOR;
+            mFunctionMeshVertices[square.bottomLeftIdx].color = REFINE_DEBUG_COLOR;
+            mFunctionMeshVertices[square.centerIdx].color = REFINE_DEBUG_COLOR;
         }
     }
 
@@ -208,7 +279,13 @@ private:
             vertex.pos.y = static_cast<float>(mFunc(vertex.pos.x, vertex.pos.z));
         }
 
-        // Create index list for all triangles.
+        for (auto &square : mFloorMeshSquares) {
+            if (shouldRefine(square)) {
+                refine(square);
+            }
+        }
+
+        // Create index list for all triangles in squares.
         mMeshIndices.clear();
         mMeshIndices.reserve(mFloorMeshSquares.size() * 12);
         for (auto &square : mFloorMeshSquares) {
@@ -282,6 +359,7 @@ private:
     // Default RGB colors for floor and function meshes.
     static constexpr glm::vec3 FLOOR_COLOR = {0.556f, 0.367f, 0.076f};
     static constexpr glm::vec3 FUNCT_COLOR = {0.070f, 0.336f, 0.594f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR = {0.0f, 1.0f, 0.0f};
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int mNumCells = 50;
