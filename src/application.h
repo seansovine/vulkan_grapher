@@ -45,7 +45,7 @@ private:
     void cleanupUIResources();
 
 private:
-    const uint32_t INITIAL_WINDOW_WIDTH = 1200;
+    const uint32_t INITIAL_WINDOW_WIDTH  = 1200;
     const uint32_t INITIAL_WINDOW_HEIGHT = 900;
 
     bool framebufferResized = false;

@@ -23,8 +23,8 @@ struct Vertex {
 
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.binding   = 0;
+        bindingDescription.stride    = sizeof(Vertex);
         bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         return bindingDescription;
@@ -33,15 +33,15 @@ struct Vertex {
     static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
         std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
 
-        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].binding  = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+        attributeDescriptions[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset   = offsetof(Vertex, pos);
 
-        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].binding  = 0;
         attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
+        attributeDescriptions[1].format   = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset   = offsetof(Vertex, color);
 
         return attributeDescriptions;
     }
@@ -70,22 +70,22 @@ struct IndexedMesh {
         float time;
         if (rotating) {
             auto currentTime = std::chrono::high_resolution_clock::now();
-            time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+            time     = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
             lastTime = time;
         } else {
             time = lastTime;
         }
 
         static constexpr float ROTATION_RADS_PER_SEC = 22.5f;
-        static constexpr float DIST_COMP = 1.5f;
+        static constexpr float DIST_COMP             = 1.5f;
 
         TransformsUniform ubo{};
         ubo.model =
             glm::rotate(glm::mat4(1.0f), time * glm::radians(ROTATION_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
-        ubo.view = glm::lookAt(glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP), glm::vec3(0.0f, 0.0f, 0.0f),
-                               glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+        ubo.view  = glm::lookAt(glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP), glm::vec3(0.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj  = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));

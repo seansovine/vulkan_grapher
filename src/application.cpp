@@ -18,7 +18,7 @@
 // GLFW callbacks.
 
 void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
-    auto app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+    auto app                = static_cast<Application *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
 }
 
@@ -93,7 +93,7 @@ void Application::initVulkan() {
         };
         static auto sinc = [](double x, double y) -> double {
             double scale = 50; // 100
-            double mag = scale * std::sqrt(x * x + y * y);
+            double mag   = scale * std::sqrt(x * x + y * y);
             return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
         };
         static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
@@ -192,10 +192,10 @@ void Application::createUICommandBuffers() {
     imGuiVulkan.uiCommandBuffers.resize(vulkan.getSwapchainInfo().swapchainImageViews.size());
 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandBufferAllocateInfo.commandPool = imGuiVulkan.uiCommandPool;
-    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(imGuiVulkan.uiCommandBuffers.size());
+    commandBufferAllocateInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.commandPool                 = imGuiVulkan.uiCommandPool;
+    commandBufferAllocateInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandBufferCount          = static_cast<uint32_t>(imGuiVulkan.uiCommandBuffers.size());
 
     if (vkAllocateCommandBuffers(vulkan.getLogicalDevice(), &commandBufferAllocateInfo,
                                  imGuiVulkan.uiCommandBuffers.data()) != VK_SUCCESS) {
@@ -205,9 +205,9 @@ void Application::createUICommandBuffers() {
 
 void Application::createUICommandPool(VkCommandPool *cmdPool, VkCommandPoolCreateFlags flags) {
     VkCommandPoolCreateInfo commandPoolCreateInfo = {};
-    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolCreateInfo.queueFamilyIndex = vulkan.getQueueIndices().graphicsFamilyIndex;
-    commandPoolCreateInfo.flags = flags;
+    commandPoolCreateInfo.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.queueFamilyIndex        = vulkan.getQueueIndices().graphicsFamilyIndex;
+    commandPoolCreateInfo.flags                   = flags;
 
     if (vkCreateCommandPool(vulkan.getLogicalDevice(), &commandPoolCreateInfo, nullptr, cmdPool) != VK_SUCCESS) {
         throw std::runtime_error("Could not create graphics command pool!");
@@ -228,11 +228,11 @@ void Application::createUIDescriptorPool() {
                                          {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
 
     VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
-    pool_info.poolSizeCount = static_cast<uint32_t>(IM_ARRAYSIZE(pool_sizes));
-    pool_info.pPoolSizes = pool_sizes;
+    pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets                    = 1000 * IM_ARRAYSIZE(pool_sizes);
+    pool_info.poolSizeCount              = static_cast<uint32_t>(IM_ARRAYSIZE(pool_sizes));
+    pool_info.pPoolSizes                 = pool_sizes;
 
     if (vkCreateDescriptorPool(vulkan.getLogicalDevice(), &pool_info, nullptr, &imGuiVulkan.uiDescriptorPool) !=
         VK_SUCCESS) {
@@ -246,25 +246,25 @@ void Application::createUIFramebuffers() {
 
 void Application::createUIRenderPass() {
     VkAttachmentDescription attachmentDescription = {};
-    attachmentDescription.format = vulkan.getSwapchainInfo().swapChainImageFormat;
-    attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachmentDescription.format                  = vulkan.getSwapchainInfo().swapChainImageFormat;
+    attachmentDescription.samples                 = VK_SAMPLE_COUNT_1_BIT;
     // UI is drawn on top of existing image.
-    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachmentDescription.loadOp        = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     // After the UI pass the images should be ready to present.
-    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachmentDescription.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    attachmentDescription.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    attachmentDescription.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
     VkAttachmentReference attachmentReference = {};
-    attachmentReference.attachment = 0;
-    attachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachmentReference.attachment            = 0;
+    attachmentReference.layout                = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &attachmentReference;
+    subpass.pColorAttachments    = &attachmentReference;
 
     // Make the UI render pass dependent on the main renderpass.
     // The docs say about VK_SUBPASS_EXTERNAL:
@@ -276,21 +276,21 @@ void Application::createUIRenderPass() {
     // https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VkSubpassDependency
 
     VkSubpassDependency subpassDependency = {};
-    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    subpassDependency.dstSubpass = 0;
-    subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    subpassDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    subpassDependency.dstStageMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependency.srcSubpass          = VK_SUBPASS_EXTERNAL;
+    subpassDependency.dstSubpass          = 0;
+    subpassDependency.srcStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependency.dstStageMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &attachmentDescription;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &subpassDependency;
+    renderPassInfo.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount        = 1;
+    renderPassInfo.pAttachments           = &attachmentDescription;
+    renderPassInfo.subpassCount           = 1;
+    renderPassInfo.pSubpasses             = &subpass;
+    renderPassInfo.dependencyCount        = 1;
+    renderPassInfo.pDependencies          = &subpassDependency;
 
     if (vkCreateRenderPass(vulkan.getLogicalDevice(), &renderPassInfo, nullptr, &imGuiVulkan.uiRenderPass) !=
         VK_SUCCESS) {

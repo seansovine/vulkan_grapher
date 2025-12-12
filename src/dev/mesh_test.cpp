@@ -11,7 +11,7 @@ static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
 
 static auto sinc = [](double x, double y) -> double {
     double scale = 50; // 100
-    double mag = scale * std::sqrt(x * x + y * y);
+    double mag   = scale * std::sqrt(x * x + y * y);
     return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
 };
 static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {

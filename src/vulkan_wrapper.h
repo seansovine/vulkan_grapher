@@ -56,8 +56,8 @@ private:
     // TODO: Make this a vector.
     std::vector<IndexedMesh> currentMeshes;
 
-    uint32_t imageCount = 0;
-    uint32_t currentFrame = 0;
+    uint32_t imageCount                 = 0;
+    uint32_t currentFrame               = 0;
     const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
     std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -66,9 +66,9 @@ private:
     std::vector<VkFence> imagesInFlight;
 
 private:
-    using DeinitUICallback = void(VkDevice);
-    using DrawUICallback = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
-    using CreateUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
+    using DeinitUICallback              = void(VkDevice);
+    using DrawUICallback                = VkCommandBuffer(uint32_t, uint32_t, const VkExtent2D &);
+    using CreateUIFrameBuffersCallback  = void(GlfwVulkanWrapper &);
     using DestroyUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
 
     // UI callbacks for dependency injection.
