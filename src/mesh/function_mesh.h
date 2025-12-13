@@ -57,10 +57,11 @@ class FunctionMesh {
     using F = double (*)(double, double);
 
     static constexpr bool USE_NEW_MESH     = true;
-    static constexpr bool DEBUG_REFINEMENT = true;
+    static constexpr bool DEBUG_REFINEMENT = false;
 
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
-    static constexpr double REFINEMENT_THRESHOLD  = 0.25;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH          = 1;
+    static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
+    static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 25.0;
 
 public:
     explicit FunctionMesh(const F func)
@@ -175,6 +176,24 @@ private:
         return mFunctionMeshVertices[index].pos.y;
     }
 
+    struct SquareFuncEval {
+        double topLeftVal;
+        double topRightVal;
+        double btmRightVal;
+        double btmLeftVal;
+        double centerVal;
+    };
+
+    SquareFuncEval evalFuncSquare(const Square &square) {
+        return {
+            .topLeftVal  = funcMeshY(square.topLeftIdx),
+            .topRightVal = funcMeshY(square.topRightIdx),
+            .btmRightVal = funcMeshY(square.bottomRightIdx),
+            .btmLeftVal  = funcMeshY(square.bottomLeftIdx),
+            .centerVal   = funcMeshY(square.centerIdx),
+        };
+    }
+
     struct XZCoord {
         float x;
         float z;
@@ -182,6 +201,33 @@ private:
 
     XZCoord meshXZ(uint16_t index) {
         return {mFloorMeshVertices[index].pos.x, mFloorMeshVertices[index].pos.z};
+    }
+
+    double secondDerivEst(const Square &square, const SquareFuncEval &funcVals) {
+        float center[2]      = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]),
+                                0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
+        float topMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mTopLeft[1]};
+        float btmMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mBtmRight[1]};
+        float leftMiddle[2]  = {square.mTopLeft[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
+        float rightMiddle[2] = {square.mBtmRight[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
+
+        double centerY      = mFunc(center[0], center[1]);
+        double topMiddleY   = mFunc(topMiddle[0], topMiddle[1]);
+        double btmMiddleY   = mFunc(btmMiddle[0], btmMiddle[1]);
+        double leftMiddleY  = mFunc(leftMiddle[0], leftMiddle[1]);
+        double rightMiddleY = mFunc(rightMiddle[0], rightMiddle[1]);
+
+        double topLeftY  = funcMeshY(square.topLeftIdx);
+        double btmLeftY  = funcMeshY(square.bottomLeftIdx);
+        double topRightY = funcMeshY(square.topRightIdx);
+        double btmRightY = funcMeshY(square.bottomRightIdx);
+
+        // See: https://en.wikipedia.org/wiki/Finite_difference#Multivariate_finite_differences
+        double fxx = 4.0 * (rightMiddleY + leftMiddleY - 2.0 * centerY) / (mCellWidth * mCellWidth);
+        double fyy = 4.0 * (topMiddleY + btmMiddleY - 2.0 * centerY) / (mCellWidth * mCellWidth);
+        double fxy = (topRightY - btmRightY - topLeftY + btmLeftY) / (mCellWidth * mCellWidth);
+
+        return std::sqrt(fxx * fxx + fyy * fyy + fxy * fxy) / 3.0;
     }
 
     // Precondition: Square vertex indices are valid for function mesh.
@@ -198,28 +244,28 @@ private:
         double maxF = std::numeric_limits<double>::lowest();
         double minF = std::numeric_limits<double>::max();
 
-        maxF = std::max(maxF, funcMeshY(square.topLeftIdx));
-        minF = std::min(minF, funcMeshY(square.topLeftIdx));
+        SquareFuncEval funcVals = evalFuncSquare(square);
 
-        maxF = std::max(maxF, funcMeshY(square.bottomLeftIdx));
-        minF = std::min(minF, funcMeshY(square.bottomLeftIdx));
+        maxF = std::max(maxF, funcVals.topLeftVal);
+        minF = std::min(minF, funcVals.topLeftVal);
+        maxF = std::max(maxF, funcVals.topRightVal);
+        minF = std::min(minF, funcVals.topRightVal);
+        maxF = std::max(maxF, funcVals.btmRightVal);
+        minF = std::min(minF, funcVals.btmRightVal);
+        maxF = std::max(maxF, funcVals.btmLeftVal);
+        minF = std::min(minF, funcVals.btmLeftVal);
+        maxF = std::max(maxF, funcVals.centerVal);
+        minF = std::min(minF, funcVals.centerVal);
 
-        maxF = std::max(maxF, funcMeshY(square.bottomRightIdx));
-        minF = std::min(minF, funcMeshY(square.bottomRightIdx));
+        double valueRange     = maxF - minF;
+        double secondDerivMag = secondDerivEst(square, funcVals);
 
-        maxF = std::max(maxF, funcMeshY(square.topRightIdx));
-        minF = std::min(minF, funcMeshY(square.topRightIdx));
-
-        maxF = std::max(maxF, funcMeshY(square.centerIdx));
-        minF = std::min(minF, funcMeshY(square.centerIdx));
-
-        double valueRange = maxF - minF;
-        bool shouldRefine = valueRange > REFINEMENT_THRESHOLD;
-
-        // TODO: Add second derivative or other further condition.
+        bool shouldRefine =
+            valueRange > REFINEMENT_THRESHOLD_VARIATION || secondDerivMag > REFINEMENT_THRESHOLD_2ND_DERIV;
 
         if constexpr (DEBUG_REFINEMENT) {
             std::cout << " - value range: " << std::to_string(valueRange) << std::endl;
+            std::cout << " - second deriv. magnitude: " << std::to_string(secondDerivMag) << std::endl;
             if (shouldRefine) {
                 std::cout << " - Refinement should be done." << std::endl;
             }
@@ -522,7 +568,9 @@ private:
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int mNumCells = 50;
-    // TODO: Switch to larger index type so we can increase this back to 100.
+
+    // = 1.0 / mNumCells.
+    static constexpr double mCellWidth = 1.0 / mNumCells;
 
     // Squares that make up x,y-plane mesh.
     std::vector<Square> mFloorMeshSquares = {};

@@ -12,14 +12,28 @@ and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](http
 _Graph of radial sinc function._
 
 You can see in the example image that the graph is much rougher in parts where the function --
-either its values or its derivatives -- are changing rapidly. We will implement a form of local mesh
-refinement to try to add enough detail in these parts of the function without doing unnecessary work
-in other areas of the graph.
+either its values or its derivatives -- are changing rapidly. To address this we have a form of local
+mesh refinement to try to add enough detail in these parts of the function without doing unnecessary
+work in other areas of the graph.
+
+## Mesh refinement
+
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_mesh_refinement_2025-12-12.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
+The green coloration in the image is a debugging feature to show where the mesh was refined.
+To decide whether to refine a square cell of the mesh, we find the variation of the function
+on that cell -- the difference between its max and min values there -- and also an estimate
+of the magnitude of its second derivatives. If either of these exceeds a predefined threshold,
+then the cell is selected for refinement. In the future we'll add these threshold parameters
+to the UI for user selection.
 
 ## What we have now
 
 We have code that renders a function -- which currently must be defined in the code --
-using a basic mesh comprised of a square tessellation divided into triangles.
+using a basic mesh comprised of a square tessellation with the mesh refinement algorithm
+described above.
 
 The UI has a feature to toggle rotation of the graph around the y-axis (which is the "up"
 axis in most computer graphics APIs).
@@ -34,7 +48,7 @@ Next we will add these graphing features:
 
 3. Add better user interaction features like mouse control of the view.
 
-4. Add function-based mesh refinement.
+4. Add user control of graphing and render parameters.
 
 ## Sources and credits
 
