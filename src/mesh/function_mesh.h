@@ -40,7 +40,6 @@ struct Square {
 
     std::vector<Square> children;
 
-    // TODO: For use in automated mesh refinement.
     bool hasChildren() const {
         return !children.empty();
     }
@@ -283,9 +282,8 @@ private:
             mFunctionMeshVertices[square.centerIdx].color      = REFINE_DEBUG_COLOR;
         }
 
-        float center[2] = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]),
-                           0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
-
+        float center[2]      = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]),
+                                0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
         float topMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mTopLeft[1]};
         float btmMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mBtmRight[1]};
         float leftMiddle[2]  = {square.mTopLeft[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
@@ -414,6 +412,7 @@ private:
             for (const Square &child : square.children) {
                 addTriIndices(child);
             }
+            return;
         }
 
         // Top triangle.
