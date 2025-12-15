@@ -1,6 +1,7 @@
 #ifndef VERTEX_H_
 #define VERTEX_H_
 
+#include "app_state.h"
 #include "uniforms.h"
 #include "vulkan_objects.h"
 
@@ -63,12 +64,12 @@ struct IndexedMesh {
     VkDescriptorSetLayout descriptorSetLayout;
     std::vector<VkDescriptorSet> descriptorSets;
 
-    void updateUniformBuffer(uint32_t currentImage, bool rotating, float aspectRatio) {
+    void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio) {
         static auto startTime = std::chrono::high_resolution_clock::now();
         static float lastTime = 0.0f;
 
         float time;
-        if (rotating) {
+        if (appState.rotating) {
             auto currentTime = std::chrono::high_resolution_clock::now();
             time     = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
             lastTime = time;
@@ -80,6 +81,8 @@ struct IndexedMesh {
         static constexpr float DIST_COMP             = 1.5f;
 
         TransformsUniform ubo{};
+
+        // Update MVP matrices.
         ubo.model =
             glm::rotate(glm::mat4(1.0f), time * glm::radians(ROTATION_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
@@ -87,6 +90,9 @@ struct IndexedMesh {
                                 glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.proj  = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
+
+        // Update mesh color.
+        ubo.meshColor = appState.graphColor;
 
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }

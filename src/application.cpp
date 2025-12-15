@@ -39,7 +39,7 @@ Application::Application() {
 }
 
 Application::~Application() {
-    std::cout << "Cleaning up" << std::endl;
+    std::cout << "Cleaning up..." << std::endl;
 
     // Cleanup DearImGui.
     ImGui_ImplVulkan_Shutdown();
@@ -52,6 +52,8 @@ Application::~Application() {
     // Cleanup GLFW.
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    std::cout << "Done." << std::endl;
 }
 
 // Initialization methods.
@@ -102,8 +104,8 @@ void Application::initVulkan() {
         std::cout << "Building function mesh." << std::endl;
         std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
         std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
-        meshesToRender = {IndexedMesh{mesh.functionVertices(), mesh.meshIndices()},
-                          IndexedMesh{mesh.floorVertices(), mesh.meshIndices()}};
+        meshesToRender = {IndexedMesh{mesh.floorVertices(), mesh.meshIndices()},
+                          IndexedMesh{mesh.functionVertices(), mesh.meshIndices()}};
 
     } else {
         meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
@@ -164,6 +166,14 @@ void Application::drawUI() {
     if (ImGui::Button("Toggle Object Rotation")) {
         appState.rotating = !appState.rotating;
     }
+    if (ImGui::Button("Toggle Wireframe Graph")) {
+        appState.wireframe = !appState.wireframe;
+    }
+
+    // PBR graph color.
+    ImGui::SliderFloat("Graph color R", &appState.graphColor.r, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Graph color G", &appState.graphColor.g, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Graph color B", &appState.graphColor.b, 0.0f, 1.0f, "%.2f");
 
     ImGui::End();
     ImGui::Render();

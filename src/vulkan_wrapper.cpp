@@ -95,7 +95,8 @@ void GlfwVulkanWrapper::deinit() {
 
     cleanupSwapChain();
 
-    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipeline(device, wireframePipeline, nullptr);
+    vkDestroyPipeline(device, pbrPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
@@ -137,13 +138,13 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
     }
 
     for (auto &mesh : currentMeshes) {
-        mesh.updateUniformBuffer(currentFrame, appState.rotating,
+        mesh.updateUniformBuffer(currentFrame, appState,
                                  swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height);
     }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    recordCommandBuffer(appState, commandBuffers[currentFrame], imageIndex);
 
     // Record UI draw commands.
     VkCommandBuffer uiBuffer = uiDrawCallback(currentFrame, imageIndex, swapChainInfo.swapChainExtent);
@@ -814,26 +815,6 @@ void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMesh &mesh) {
 }
 
 void GlfwVulkanWrapper::createGraphicsPipeline() {
-    auto vertShaderCode = loadShader("shaders/vert.spv");
-    auto fragShaderCode = loadShader("shaders/frag.spv");
-
-    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-    vertShaderStageInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage                           = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module                          = vertShaderModule;
-    vertShaderStageInfo.pName                           = "main";
-
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-    fragShaderStageInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage                           = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module                          = fragShaderModule;
-    fragShaderStageInfo.pName                           = "main";
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType                                = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -881,7 +862,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     rasterizerInfo.depthBiasClamp                         = 0.0f;
     rasterizerInfo.depthBiasSlopeFactor                   = 0.0f;
 
-    // Render wireframe until we have lighting implemented.
+    // Render wireframe.
     rasterizerInfo.polygonMode = VK_POLYGON_MODE_LINE;
 
     VkPipelineMultisampleStateCreateInfo multisamplingInfo = {};
@@ -936,6 +917,28 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
         throw std::runtime_error("Unable to create graphics pipeline layout!");
     }
 
+    // Create wireframe pipelin.
+
+    auto vertShaderCode = loadShader("shaders/wireframe_vert.spv");
+    auto fragShaderCode = loadShader("shaders/wireframe_frag.spv");
+
+    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+    vertShaderStageInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage                           = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module                          = vertShaderModule;
+    vertShaderStageInfo.pName                           = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+    fragShaderStageInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage                           = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module                          = fragShaderModule;
+    fragShaderStageInfo.pName                           = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount                   = 2;
@@ -953,7 +956,41 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.subpass                      = 0;
     pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &wireframePipeline) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Unable to create graphics pipeline!");
+    }
+
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
+
+    // Create PBR pipeline.
+
+    rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
+
+    vertShaderCode = loadShader("shaders/pbr_vert.spv");
+    fragShaderCode = loadShader("shaders/pbr_frag.spv");
+
+    vertShaderModule = createShaderModule(vertShaderCode);
+    fragShaderModule = createShaderModule(fragShaderCode);
+
+    vertShaderStageInfo        = {};
+    vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName  = "main";
+
+    fragShaderStageInfo        = {};
+    fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName  = "main";
+
+    shaderStages[0]      = vertShaderStageInfo;
+    shaderStages[1]      = fragShaderStageInfo;
+    pipelineInfo.pStages = shaderStages;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pbrPipeline) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline!");
     }
 
@@ -1136,7 +1173,8 @@ void GlfwVulkanWrapper::createCommandBuffers() {
     }
 }
 
-void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandBuffer commandBuffer,
+                                            uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -1161,8 +1199,6 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
         VkViewport viewport{};
         viewport.x        = 0.0f;
         viewport.y        = 0.0f;
@@ -1177,7 +1213,14 @@ void GlfwVulkanWrapper::recordCommandBuffer(VkCommandBuffer commandBuffer, uint3
         scissor.extent = swapChainInfo.swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        for (const auto &mesh : currentMeshes) {
+        for (uint32_t i = 0; i < currentMeshes.size(); i++) {
+            if (i == static_cast<uint32_t>(MeshStage::DRAW_FLOOR)) {
+                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipeline);
+            } else if (i == static_cast<uint32_t>(MeshStage::DRAW_GRAPH) && !appState.wireframe) {
+                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrPipeline);
+            }
+
+            const auto &mesh         = currentMeshes[i];
             VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
             VkDeviceSize offsets[]   = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);

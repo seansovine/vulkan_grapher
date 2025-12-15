@@ -11,5 +11,5 @@ run:
 meshtest:
 	@build/src/dev/mesh-test
 
-shaderc: shaders/shader.frag shaders/shader.vert
+shaderc: shaders/*.frag shaders/*.vert
 	@shaders/compile.sh

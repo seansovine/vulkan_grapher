@@ -48,7 +48,14 @@ private:
     ImageInfo depthImageInfo;
 
     VkPipelineLayout pipelineLayout;
-    VkPipeline pipeline;
+    VkPipeline wireframePipeline;
+    VkPipeline pbrPipeline;
+
+    enum class MeshStage : uint8_t {
+        DRAW_FLOOR = 0,
+        DRAW_GRAPH = 1,
+        DRAW_OTHER = 2,
+    };
 
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
@@ -105,7 +112,7 @@ public:
 
     // Rendering functions.
     void drawFrame(const AppState &appState, bool frameBufferResized);
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void recordCommandBuffer(const AppState &appState, VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 public:
     uint32_t getImageCount() {
