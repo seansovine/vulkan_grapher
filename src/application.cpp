@@ -9,10 +9,12 @@
 #include <imgui/imgui.h>
 #include <vulkan/vulkan_core.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 // GLFW callbacks.
@@ -137,6 +139,10 @@ void Application::run() {
         glfwPollEvents();
         drawUI();
         drawFrame();
+
+        // Limit frame computation rate, as we target 60 FPS.
+        constexpr int64_t timeout = 1000 * 1 / 65.0f;
+        std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
     }
 
     vulkan.waitForDeviceIdle();
