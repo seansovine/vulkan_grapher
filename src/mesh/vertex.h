@@ -96,22 +96,25 @@ struct IndexedMesh {
             time = lastTime;
         }
 
-        static constexpr float ROTATION_RADS_PER_SEC = 22.5f;
-        static constexpr float DIST_COMP             = 1.5f;
+        static constexpr float ROT_RADS_PER_SEC = 22.5f;
+        static constexpr float DIST_COMP        = 1.5f;
+        static constexpr glm::vec3 VIEWER_POS   = glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP);
 
         TransformsUniform ubo{};
 
         // Update MVP matrices.
-        ubo.model =
-            glm::rotate(glm::mat4(1.0f), time * glm::radians(ROTATION_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(ROT_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
-        ubo.view  = glm::lookAt(glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP), glm::vec3(0.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view  = glm::lookAt(VIEWER_POS, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.proj  = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+
+        // Correct orientation.
         ubo.proj[1][1] *= -1;
 
         // Update mesh color.
-        ubo.meshColor = appState.graphColor;
+        ubo.meshColor = appState.graphColor / (glm::dot(appState.graphColor, glm::vec3(1.0f, 1.0f, 1.0f)));
+        // Set viewer position; constant for now.
+        ubo.viewerPos = VIEWER_POS;
 
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }

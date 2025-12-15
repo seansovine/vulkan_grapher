@@ -6,7 +6,7 @@
 
 struct AppState {
     bool rotating  = true;
-    bool wireframe = true;
+    bool wireframe = false;
 
     glm::vec3 graphColor = {0.070f, 0.336f, 0.594f};
 };

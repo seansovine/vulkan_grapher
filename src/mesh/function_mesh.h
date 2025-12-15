@@ -67,7 +67,7 @@ class FunctionMesh {
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool DEBUG_REFINEMENT = false;
 
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH          = 1;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH          = 0;
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 25.0;
 
