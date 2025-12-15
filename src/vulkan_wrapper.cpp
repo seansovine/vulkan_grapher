@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "shaderloader.h"
+#include "shader_util.h"
 #include "uniforms.h"
 #include "vertex.h"
 #include "vulkan_debug.h"
@@ -16,7 +16,6 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
-#include <string>
 
 // State management functions.
 
@@ -815,8 +814,8 @@ void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMesh &mesh) {
 }
 
 void GlfwVulkanWrapper::createGraphicsPipeline() {
-    auto vertShaderCode = ShaderLoader::load("shaders/vert.spv");
-    auto fragShaderCode = ShaderLoader::load("shaders/frag.spv");
+    auto vertShaderCode = loadShader("shaders/vert.spv");
+    auto fragShaderCode = loadShader("shaders/frag.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
