@@ -1,6 +1,6 @@
 add_subdirectory(imgui)
 
-add_subdirectory(vulkan)
+add_subdirectory(vulkan_util)
 add_subdirectory(mesh)
 add_subdirectory(dev)
 
