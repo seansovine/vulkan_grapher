@@ -12,6 +12,65 @@
 #include <string>
 #include <vector>
 
+// Square implementations.
+
+const Square::EdgeRefinements &Square::populateRefinements() {
+    if (!hasChildren()) {
+        edgeRefinements = {
+            .northRefinements = {topLeftIdx, topRightIdx},
+            .westRefinements  = {topLeftIdx, bottomLeftIdx},
+            .southRefinements = {bottomLeftIdx, bottomRightIdx},
+            .eastRefinements  = {topRightIdx, bottomRightIdx},
+        };
+        return edgeRefinements;
+    }
+    // Invariant: A square has 0 or 4 children.
+    assert(children.size() == 4);
+
+    // Absorb refinements from children.
+
+    Square &topLeftChild                  = children[0];
+    const EdgeRefinements *tlcRefinements = &topLeftChild.populateRefinements();
+    for (uint32_t i = 0; i < tlcRefinements->northRefinements.size() - 1; i++) {
+        edgeRefinements.northRefinements.push_back(tlcRefinements->northRefinements[i]);
+    }
+    for (uint32_t i = 0; i < tlcRefinements->westRefinements.size() - 1; i++) {
+        edgeRefinements.westRefinements.push_back(tlcRefinements->westRefinements[i]);
+    }
+    // Omit last to avoid duplicates.
+
+    Square &topRightChild = children[1];
+    tlcRefinements        = &topRightChild.populateRefinements();
+    for (uint32_t i = 0; i < tlcRefinements->northRefinements.size(); i++) {
+        edgeRefinements.northRefinements.push_back(tlcRefinements->northRefinements[i]);
+    }
+    for (uint32_t i = 0; i < tlcRefinements->eastRefinements.size() - 1; i++) {
+        edgeRefinements.eastRefinements.push_back(tlcRefinements->eastRefinements[i]);
+    }
+
+    Square &bottomLeftChild = children[2];
+    tlcRefinements          = &bottomLeftChild.populateRefinements();
+    for (uint32_t i = 0; i < tlcRefinements->southRefinements.size() - 1; i++) {
+        edgeRefinements.southRefinements.push_back(tlcRefinements->southRefinements[i]);
+    }
+    for (uint32_t i = 0; i < tlcRefinements->westRefinements.size(); i++) {
+        edgeRefinements.westRefinements.push_back(tlcRefinements->westRefinements[i]);
+    }
+
+    Square &bottomRightChild = children[3];
+    tlcRefinements           = &bottomRightChild.populateRefinements();
+    for (uint32_t i = 0; i < tlcRefinements->southRefinements.size(); i++) {
+        edgeRefinements.southRefinements.push_back(tlcRefinements->southRefinements[i]);
+    }
+    for (uint32_t i = 0; i < tlcRefinements->eastRefinements.size(); i++) {
+        edgeRefinements.eastRefinements.push_back(tlcRefinements->eastRefinements[i]);
+    }
+
+    return edgeRefinements;
+}
+
+// FunctionMesh implementations.
+
 void FunctionMesh::buildFloorMesh() {
     mFloorMeshSquares.reserve(mNumCells * mNumCells);
     const double width = 1.0 / mNumCells;
@@ -251,7 +310,7 @@ void FunctionMesh::refine(Square &square) {
         .centerIdx      = newCenterIdx4,
     });
 
-    // TODO: Recurse if necessary.
+    // TODO: Recurse if necessary when we support deeper refinement.
 }
 
 void FunctionMesh::addSquareTris(const Square &square) {
@@ -272,14 +331,34 @@ void FunctionMesh::addSquareTris(const Square &square) {
         mVertexTriangles[idx3].insert(newTriIdx);
     };
 
-    // Top triangle.
-    addTri(square.centerIdx, square.topRightIdx, square.topLeftIdx);
-    // Left triangle.
-    addTri(square.centerIdx, square.topLeftIdx, square.bottomLeftIdx);
-    // Bottom triangle.
-    addTri(square.centerIdx, square.bottomLeftIdx, square.bottomRightIdx);
-    // Right triangle.
-    addTri(square.centerIdx, square.bottomRightIdx, square.topRightIdx);
+    // NOTE: This handles squares that don't have children. Effectively
+    //       we currently only support refining meshes to a single level.
+    //       We'll have to think of something more sophisticated to allow
+    //       further levels of refinement.
+
+    // Top triangles.
+    const auto &northRefinements = square.edgeRefinements.northRefinements;
+    for (uint32_t i = 0; i < northRefinements.size() - 1; i++) {
+        addTri(square.centerIdx, northRefinements[i + 1], northRefinements[i]);
+    }
+
+    // Left triangles.
+    const auto &westRefinements = square.edgeRefinements.westRefinements;
+    for (uint32_t i = 0; i < westRefinements.size() - 1; i++) {
+        addTri(square.centerIdx, westRefinements[i], westRefinements[i + 1]);
+    }
+
+    // Bottom triangles.
+    const auto &southRefinements = square.edgeRefinements.southRefinements;
+    for (uint32_t i = 0; i < southRefinements.size() - 1; i++) {
+        addTri(square.centerIdx, southRefinements[i], southRefinements[i + 1]);
+    }
+
+    // Right triangles.
+    const auto &eastRefinements = square.edgeRefinements.eastRefinements;
+    for (uint32_t i = 0; i < eastRefinements.size() - 1; i++) {
+        addTri(square.centerIdx, eastRefinements[i + 1], eastRefinements[i]);
+    }
 }
 
 void FunctionMesh::addTriIndices(const Triangle &tri) {
@@ -382,6 +461,24 @@ void FunctionMesh::computeVerticesAndIndices() {
     for (auto &square : mFloorMeshSquares) {
         if (shouldRefine(square)) {
             refine(square);
+        }
+        auto _ = square.populateRefinements();
+
+        // NOTE: This depends on the ordering of squares across
+        // columns left-to-right then down rows top-to-bottom.
+        if (square.northNeighbor) {
+            if (!square.hasChildren() && square.northNeighbor->hasChildren()) {
+                square.edgeRefinements.northRefinements = square.northNeighbor->edgeRefinements.southRefinements;
+            } else if (square.hasChildren() && !square.northNeighbor->hasChildren()) {
+                square.northNeighbor->edgeRefinements.southRefinements = square.edgeRefinements.northRefinements;
+            }
+        }
+        if (square.westNeighbor) {
+            if (!square.hasChildren() && square.westNeighbor->hasChildren()) {
+                square.edgeRefinements.westRefinements = square.westNeighbor->edgeRefinements.eastRefinements;
+            } else if (square.hasChildren() && !square.westNeighbor->hasChildren()) {
+                square.westNeighbor->edgeRefinements.eastRefinements = square.edgeRefinements.westRefinements;
+            }
         }
     }
 

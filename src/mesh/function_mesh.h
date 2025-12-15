@@ -7,7 +7,9 @@
 
 #include <cassert>
 #include <cstdint>
+#include <ostream>
 #include <set>
+#include <vector>
 
 // ------------------
 // Geometric helpers.
@@ -47,66 +49,14 @@ struct Square {
     }
 
     struct EdgeRefinements {
-        std::set<float> northRefinements;
-        std::set<float> westRefinements;
-        std::set<float> southRefinements;
-        std::set<float> eastRefinements;
+        std::vector<uint16_t> northRefinements;
+        std::vector<uint16_t> westRefinements;
+        std::vector<uint16_t> southRefinements;
+        std::vector<uint16_t> eastRefinements;
     };
     EdgeRefinements edgeRefinements;
 
-    const EdgeRefinements &populateRefinements() {
-        edgeRefinements = {
-            .northRefinements = {0.0f, 1.0f},
-            .westRefinements  = {0.0f, 1.0f},
-            .southRefinements = {0.0f, 1.0f},
-            .eastRefinements  = {0.0f, 1.0f},
-        };
-        if (!hasChildren()) {
-            return edgeRefinements;
-        }
-        // Invariant: A square has 0 or 4 children.
-        assert(children.size() == 4);
-
-        // Absorb refinements from children.
-
-        Square &topLeftChild                  = children[0];
-        const EdgeRefinements *tlcRefinements = &topLeftChild.populateRefinements();
-        for (float childRfmnt : tlcRefinements->northRefinements) {
-            edgeRefinements.northRefinements.insert(0.5 * childRfmnt);
-        }
-        for (float childRfmnt : tlcRefinements->westRefinements) {
-            edgeRefinements.westRefinements.insert(0.5 * childRfmnt);
-        }
-
-        Square &topRightChild = children[1];
-        tlcRefinements        = &topRightChild.populateRefinements();
-        for (float childRfmnt : tlcRefinements->northRefinements) {
-            edgeRefinements.northRefinements.insert(0.5 + 0.5 * childRfmnt);
-        }
-        for (float childRfmnt : tlcRefinements->eastRefinements) {
-            edgeRefinements.eastRefinements.insert(0.5 * childRfmnt);
-        }
-
-        Square &bottomLeftChild = children[2];
-        tlcRefinements          = &bottomLeftChild.populateRefinements();
-        for (float childRfmnt : tlcRefinements->southRefinements) {
-            edgeRefinements.southRefinements.insert(0.5 * childRfmnt);
-        }
-        for (float childRfmnt : tlcRefinements->westRefinements) {
-            edgeRefinements.westRefinements.insert(0.5 + 0.5 * childRfmnt);
-        }
-
-        Square &bottomRightChild = children[2];
-        tlcRefinements           = &bottomRightChild.populateRefinements();
-        for (float childRfmnt : tlcRefinements->southRefinements) {
-            edgeRefinements.southRefinements.insert(0.5 + 0.5 * childRfmnt);
-        }
-        for (float childRfmnt : tlcRefinements->eastRefinements) {
-            edgeRefinements.eastRefinements.insert(0.5 + 0.5 * childRfmnt);
-        }
-
-        return edgeRefinements;
-    }
+    const EdgeRefinements &populateRefinements();
 };
 
 struct Triangle {
@@ -168,9 +118,38 @@ public:
         return mMeshIndices;
     }
 
-    std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint32_t vertex_i) {
+    std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint16_t vertex_i) {
         const Vertex &vertex = mFloorMeshVertices[vertex_i];
         debugStrm << "(" << vertex.pos.x << ", " << vertex.pos.z << ")";
+        return debugStrm;
+    }
+
+    std::basic_ostream<char> &debugRefinements(std::basic_ostream<char> &debugStrm, const Square &square) {
+        std::string indent(square.depth * 4, ' ');
+        debugStrm << indent << " = North refinements:";
+        for (uint16_t refinmnt : square.edgeRefinements.northRefinements) {
+            debugStrm << " ";
+            debugVertex(debugStrm, refinmnt);
+        }
+        debugStrm << std::endl;
+        debugStrm << indent << " = West refinements:";
+        for (uint16_t refinmnt : square.edgeRefinements.westRefinements) {
+            debugStrm << " ";
+            debugVertex(debugStrm, refinmnt);
+        }
+        debugStrm << std::endl;
+        debugStrm << indent << " = South refinements:";
+        for (uint16_t refinmnt : square.edgeRefinements.southRefinements) {
+            debugStrm << " ";
+            debugVertex(debugStrm, refinmnt);
+        }
+        debugStrm << std::endl;
+        debugStrm << indent << " = East refinements:";
+        for (uint16_t refinmnt : square.edgeRefinements.eastRefinements) {
+            debugStrm << " ";
+            debugVertex(debugStrm, refinmnt);
+        }
+
         return debugStrm;
     }
 
@@ -190,7 +169,6 @@ public:
         debugVertex(debugStrm, square.bottomLeftIdx) << std::endl;
         debugStrm << indent << " - center: ";
         debugVertex(debugStrm, square.centerIdx) << std::endl;
-        square_i++;
 
         if (square.hasChildren()) {
             debugStrm << indent << " + Children:" << std::endl;
@@ -198,7 +176,9 @@ public:
                 debugStrm << debugSquareCell(child, square_i);
             }
         }
+        debugRefinements(debugStrm, square) << std::endl;
 
+        square_i++;
         return debugStrm.str();
     }
 
@@ -318,6 +298,11 @@ private:
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int mNumCells = 50;
+
+    // Ensure we don't overlow our index type: This check is
+    // necessary, but not sufficient, because of mesh refinement.
+    static_assert(static_cast<uint64_t>(mNumCells) * static_cast<uint64_t>(mNumCells) <
+                  static_cast<uint64_t>(UINT16_MAX));
 
     // = 1.0 / mNumCells.
     static constexpr double mCellWidth = 1.0 / mNumCells;
