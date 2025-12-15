@@ -6,7 +6,6 @@ add_subdirectory(dev)
 
 SET(HEADERS
 	application.h
-	shaderloader.h
 	imgui_vulkan_data.h
 	vulkan_wrapper.h
 )
