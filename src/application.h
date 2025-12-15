@@ -35,16 +35,6 @@ private:
     void toggleMesh();
 
 private:
-    // ImGui resource management functions.
-    void createUICommandBuffers();
-    void createUICommandPool(VkCommandPool *commandPool, VkCommandPoolCreateFlags flags);
-    void createUIDescriptorPool();
-    void createUIFramebuffers();
-    void createUIRenderPass();
-
-    void cleanupUIResources();
-
-private:
     const uint32_t INITIAL_WINDOW_WIDTH  = 1200;
     const uint32_t INITIAL_WINDOW_HEIGHT = 900;
 

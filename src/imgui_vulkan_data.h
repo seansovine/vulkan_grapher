@@ -16,16 +16,20 @@ struct ImGuiVulkanData {
     VkRenderPass uiRenderPass;
     VkDescriptorPool uiDescriptorPool;
 
+public:
     VkCommandBuffer recordDrawCommands(uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent);
 
+    void init(GlfwVulkanWrapper &vulkan);
     void deinit(VkDevice logicalDevice);
 
     void createFrameBuffers(GlfwVulkanWrapper &vulkan);
-
     void destroyFrameBuffers(GlfwVulkanWrapper &vulkan);
 
-    // TODO: Implement this and use it, and move other UI setup here from Application.
+private:
+    void createDescriptorPool(GlfwVulkanWrapper &vulkan);
     void createRenderPass(GlfwVulkanWrapper &vulkan);
+    void createCommandPool(GlfwVulkanWrapper &vulkan);
+    void createCommandBuffers(GlfwVulkanWrapper &vulkan);
 };
 
 #endif // IMGUI_VULKAN_DATA_H_
