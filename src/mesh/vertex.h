@@ -112,7 +112,7 @@ struct IndexedMesh {
         ubo.proj[1][1] *= -1;
 
         // Update mesh color.
-        ubo.meshColor = appState.graphColor / (glm::dot(appState.graphColor, glm::vec3(1.0f, 1.0f, 1.0f)));
+        ubo.meshColor = appState.graphColor;
         // Set viewer position; constant for now.
         ubo.viewerPos = VIEWER_POS;
 

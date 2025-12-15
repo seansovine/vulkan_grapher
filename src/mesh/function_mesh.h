@@ -5,6 +5,7 @@
 
 #include <glm/fwd.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <set>
 
@@ -35,6 +36,7 @@ struct Square {
     uint16_t centerIdx      = UINT16_MAX;
 
     // Child squares if this has been refined.
+    // Order is: top-left, top-right, bottom-left, bottom-right.
     std::vector<Square> children;
 
     // Indices of triangles for this square.
@@ -42,6 +44,68 @@ struct Square {
 
     bool hasChildren() const {
         return !children.empty();
+    }
+
+    struct EdgeRefinements {
+        std::set<float> northRefinements;
+        std::set<float> westRefinements;
+        std::set<float> southRefinements;
+        std::set<float> eastRefinements;
+    };
+    EdgeRefinements edgeRefinements;
+
+    const EdgeRefinements &populateRefinements() {
+        edgeRefinements = {
+            .northRefinements = {0.0f, 1.0f},
+            .westRefinements  = {0.0f, 1.0f},
+            .southRefinements = {0.0f, 1.0f},
+            .eastRefinements  = {0.0f, 1.0f},
+        };
+        if (!hasChildren()) {
+            return edgeRefinements;
+        }
+        // Invariant: A square has 0 or 4 children.
+        assert(children.size() == 4);
+
+        // Absorb refinements from children.
+
+        Square &topLeftChild                  = children[0];
+        const EdgeRefinements *tlcRefinements = &topLeftChild.populateRefinements();
+        for (float childRfmnt : tlcRefinements->northRefinements) {
+            edgeRefinements.northRefinements.insert(0.5 * childRfmnt);
+        }
+        for (float childRfmnt : tlcRefinements->westRefinements) {
+            edgeRefinements.westRefinements.insert(0.5 * childRfmnt);
+        }
+
+        Square &topRightChild = children[1];
+        tlcRefinements        = &topRightChild.populateRefinements();
+        for (float childRfmnt : tlcRefinements->northRefinements) {
+            edgeRefinements.northRefinements.insert(0.5 + 0.5 * childRfmnt);
+        }
+        for (float childRfmnt : tlcRefinements->eastRefinements) {
+            edgeRefinements.eastRefinements.insert(0.5 * childRfmnt);
+        }
+
+        Square &bottomLeftChild = children[2];
+        tlcRefinements          = &bottomLeftChild.populateRefinements();
+        for (float childRfmnt : tlcRefinements->southRefinements) {
+            edgeRefinements.southRefinements.insert(0.5 * childRfmnt);
+        }
+        for (float childRfmnt : tlcRefinements->westRefinements) {
+            edgeRefinements.westRefinements.insert(0.5 + 0.5 * childRfmnt);
+        }
+
+        Square &bottomRightChild = children[2];
+        tlcRefinements           = &bottomRightChild.populateRefinements();
+        for (float childRfmnt : tlcRefinements->southRefinements) {
+            edgeRefinements.southRefinements.insert(0.5 + 0.5 * childRfmnt);
+        }
+        for (float childRfmnt : tlcRefinements->eastRefinements) {
+            edgeRefinements.eastRefinements.insert(0.5 + 0.5 * childRfmnt);
+        }
+
+        return edgeRefinements;
     }
 };
 
@@ -67,7 +131,7 @@ class FunctionMesh {
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool DEBUG_REFINEMENT = false;
 
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH          = 0;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH          = 1;
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 25.0;
 
