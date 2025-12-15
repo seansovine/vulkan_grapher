@@ -5,6 +5,9 @@
 
 #include <glm/fwd.hpp>
 
+#include <cstdint>
+#include <set>
+
 // ------------------
 // Geometric helpers.
 
@@ -31,11 +34,24 @@ struct Square {
     uint16_t bottomLeftIdx  = UINT16_MAX;
     uint16_t centerIdx      = UINT16_MAX;
 
+    // Child squares if this has been refined.
     std::vector<Square> children;
+
+    // Indices of triangles for this square.
+    std::vector<uint16_t> triangleIndices;
 
     bool hasChildren() const {
         return !children.empty();
     }
+};
+
+struct Triangle {
+    uint16_t vert1Idx = UINT16_MAX;
+    uint16_t vert2Idx = UINT16_MAX;
+    uint16_t vert3Idx = UINT16_MAX;
+
+    // Normal vector in world coordinates.
+    glm::vec3 normal;
 };
 
 // --------------------
@@ -136,6 +152,10 @@ private:
 
     void buildFloorMesh();
 
+    void addFloorMeshVertex(float x, float z);
+
+    void setFuncVertTBNs();
+
     double funcMeshY(uint16_t index) {
         return mFunctionMeshVertices[index].pos.y;
     }
@@ -174,7 +194,9 @@ private:
 
     void refine(Square &square);
 
-    void addTriIndices(const Square &square);
+    void addSquareTris(const Square &square);
+
+    void addTriIndices(const Triangle &tri);
 
     // DEPRECATED: Old method of mesh construction.
 
@@ -242,6 +264,11 @@ private:
     std::vector<Vertex> mFloorMeshVertices = {};
     // Tessellation vertices with heights from function values.
     std::vector<Vertex> mFunctionMeshVertices = {};
+
+    // Triangles in the function mesh; also used for floor mesh.
+    std::vector<Triangle> mFunctionMeshTriangles = {};
+    // Indices of triangles this vertex is incident to; for normal calculations.
+    std::vector<std::set<uint16_t>> mVertexTriangles = {};
 
     // For now we assume a simple relationship between floor and function meshes.
     std::vector<uint16_t> mMeshIndices = {};

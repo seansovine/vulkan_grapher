@@ -1,6 +1,11 @@
 #include "function_mesh.h"
+#include "vertex.h"
+
+#include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <ostream>
@@ -109,6 +114,16 @@ bool FunctionMesh::shouldRefine(Square &square) {
     return shouldRefine;
 }
 
+void FunctionMesh::addFloorMeshVertex(float x, float z) {
+    mFloorMeshVertices.push_back(Vertex{
+        .pos       = {x, 0.0f, z},
+        .color     = FLOOR_COLOR,
+        .tangent   = {1.0f, 0.0f, 0.0f},
+        .bitangent = {0.0f, 0.0f, 1.0f},
+        .normal    = {0.0f, 1.0f, 0.0f},
+    });
+}
+
 void FunctionMesh::refine(Square &square) {
     if constexpr (DEBUG_REFINEMENT) {
         mFunctionMeshVertices[square.topLeftIdx].color     = REFINE_DEBUG_COLOR;
@@ -131,10 +146,7 @@ void FunctionMesh::refine(Square &square) {
     }
 
     auto addVert = [this, funcColor](float coords[2]) -> uint16_t {
-        mFloorMeshVertices.push_back(Vertex{
-            .pos   = {coords[0], 0.0f, coords[1]},
-            .color = FLOOR_COLOR,
-        });
+        addFloorMeshVertex(coords[0], coords[1]);
         mFunctionMeshVertices.push_back(Vertex{
             .pos   = {coords[0], mFunc(coords[0], coords[1]), coords[1]},
             .color = funcColor,
@@ -242,31 +254,80 @@ void FunctionMesh::refine(Square &square) {
     // TODO: Recurse if necessary.
 }
 
-void FunctionMesh::addTriIndices(const Square &square) {
+void FunctionMesh::addSquareTris(const Square &square) {
     // If square has children, instead recurse into them.
     if (square.hasChildren()) {
         for (const Square &child : square.children) {
-            addTriIndices(child);
+            addSquareTris(child);
         }
         return;
     }
 
+    auto addTri = [this](uint16_t idx1, uint16_t idx2, uint16_t idx3) {
+        Triangle newTri = {.vert1Idx = idx1, .vert2Idx = idx2, .vert3Idx = idx3};
+        mFunctionMeshTriangles.push_back(newTri);
+        size_t newTriIdx = mFunctionMeshTriangles.size() - 1;
+        mVertexTriangles[idx1].insert(newTriIdx);
+        mVertexTriangles[idx2].insert(newTriIdx);
+        mVertexTriangles[idx3].insert(newTriIdx);
+    };
+
     // Top triangle.
-    mMeshIndices.push_back(square.centerIdx);
-    mMeshIndices.push_back(square.topRightIdx);
-    mMeshIndices.push_back(square.topLeftIdx);
+    addTri(square.centerIdx, square.topRightIdx, square.topLeftIdx);
     // Left triangle.
-    mMeshIndices.push_back(square.centerIdx);
-    mMeshIndices.push_back(square.topLeftIdx);
-    mMeshIndices.push_back(square.bottomLeftIdx);
+    addTri(square.centerIdx, square.topLeftIdx, square.bottomLeftIdx);
     // Bottom triangle.
-    mMeshIndices.push_back(square.centerIdx);
-    mMeshIndices.push_back(square.bottomLeftIdx);
-    mMeshIndices.push_back(square.bottomRightIdx);
+    addTri(square.centerIdx, square.bottomLeftIdx, square.bottomRightIdx);
     // Right triangle.
-    mMeshIndices.push_back(square.centerIdx);
-    mMeshIndices.push_back(square.bottomRightIdx);
-    mMeshIndices.push_back(square.topRightIdx);
+    addTri(square.centerIdx, square.bottomRightIdx, square.topRightIdx);
+}
+
+void FunctionMesh::addTriIndices(const Triangle &tri) {
+    mMeshIndices.push_back(tri.vert1Idx);
+    mMeshIndices.push_back(tri.vert2Idx);
+    mMeshIndices.push_back(tri.vert3Idx);
+}
+
+void FunctionMesh::setFuncVertTBNs() {
+    // Assign normal to each triangle.
+    for (Triangle &tri : mFunctionMeshTriangles) {
+        glm::vec3 &vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
+        glm::vec3 &vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
+        glm::vec3 &vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
+        // TODO: Make sure we have the correct orientation.
+        tri.normal = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
+    }
+
+    constexpr glm::vec3 xDir = {1.0f, 0.0f, 0.0f};
+    constexpr glm::vec3 zDir = {0.0f, 0.0f, 1.0f};
+
+    // Now compute TBN basis for each vertex by averaging tri normals.
+    for (uint16_t i = 0; i < mFloorMeshVertices.size(); i++) {
+        Vertex &funcVert = mFunctionMeshVertices[i];
+
+        glm::vec3 avgNormal = {0.0f, 0.0f, 0.0f};
+        for (uint16_t vertTriIdx : mVertexTriangles[i]) {
+            const Triangle &vertTri = mFunctionMeshTriangles[vertTriIdx];
+            avgNormal += vertTri.normal * (1.0f / mVertexTriangles[i].size());
+        }
+        avgNormal       = glm::normalize(avgNormal);
+        funcVert.normal = avgNormal;
+
+        // Use Gram-Schmidt to get ONB.
+        glm::vec3 tangent = glm::normalize(xDir - glm::dot(xDir, avgNormal) * avgNormal);
+        glm::vec3 bitangent =
+            glm::normalize(zDir - glm::dot(zDir, avgNormal) * avgNormal - glm::dot(zDir, tangent) * tangent);
+        funcVert.tangent   = tangent;
+        funcVert.bitangent = bitangent;
+
+        // Verify orientation and orthonormality.
+        constexpr float TRIPLE_ERROR_TOLERANCE = 0.01f;
+        float scalarTriple                     = glm::dot(avgNormal, glm::cross(funcVert.bitangent, funcVert.tangent));
+        if (std::abs(scalarTriple - 1.0f) >= TRIPLE_ERROR_TOLERANCE) {
+            std::cout << "TBN scalar triple product: " << std::to_string(scalarTriple) << std::endl;
+        }
+        assert(std::abs(scalarTriple - 1.0f) < TRIPLE_ERROR_TOLERANCE);
+    }
 }
 
 // New method. Once complete will replace old methods.
@@ -290,39 +351,24 @@ void FunctionMesh::computeVerticesAndIndices() {
 
         // Add remaining unassigned vertices and indices.
         if (square.topLeftIdx == UINT16_MAX) {
-            mFloorMeshVertices.push_back(Vertex{
-                .pos   = glm::vec3{square.mTopLeft[0], 0.0, square.mTopLeft[1]}, //
-                .color = FLOOR_COLOR                                             //
-            });
+            addFloorMeshVertex(square.mTopLeft[0], square.mTopLeft[1]);
             square.topLeftIdx = mFloorMeshVertices.size() - 1;
         }
         if (square.topRightIdx == UINT16_MAX) {
-            mFloorMeshVertices.push_back(Vertex{
-                .pos   = glm::vec3{square.mBtmRight[0], 0.0, square.mTopLeft[1]}, //
-                .color = FLOOR_COLOR                                              //
-            });
+            addFloorMeshVertex(square.mBtmRight[0], square.mTopLeft[1]);
             square.topRightIdx = mFloorMeshVertices.size() - 1;
         }
         if (square.bottomRightIdx == UINT16_MAX) {
-            mFloorMeshVertices.push_back(Vertex{
-                .pos   = glm::vec3{square.mBtmRight[0], 0.0, square.mBtmRight[1]}, //
-                .color = FLOOR_COLOR                                               //
-            });
+            addFloorMeshVertex(square.mBtmRight[0], square.mBtmRight[1]);
             square.bottomRightIdx = mFloorMeshVertices.size() - 1;
         }
         if (square.bottomLeftIdx == UINT16_MAX) {
-            mFloorMeshVertices.push_back(Vertex{
-                .pos   = glm::vec3{square.mTopLeft[0], 0.0, square.mBtmRight[1]}, //
-                .color = FLOOR_COLOR                                              //
-            });
+            addFloorMeshVertex(square.mTopLeft[0], square.mBtmRight[1]);
             square.bottomLeftIdx = mFloorMeshVertices.size() - 1;
         }
 
         // Add center vertex and index.
-        mFloorMeshVertices.push_back(Vertex{
-            .pos   = glm::vec3{centerX, 0.0, centerZ}, //
-            .color = FLOOR_COLOR                       //
-        });
+        addFloorMeshVertex(centerX, centerZ);
         square.centerIdx = mFloorMeshVertices.size() - 1;
     }
 
@@ -339,10 +385,22 @@ void FunctionMesh::computeVerticesAndIndices() {
         }
     }
 
-    // Create index list for all triangles in squares.
+    // Create triangles for squares.
     mMeshIndices.clear();
+    // NOTE: This will not be accurate if refinement happens.
     mMeshIndices.reserve(mFloorMeshSquares.size() * 12);
+    // These must have the same size as # mesh vertices.
+    mFunctionMeshTriangles.resize(mFloorMeshVertices.size());
+    mVertexTriangles.resize(mFloorMeshVertices.size());
+
     for (auto &square : mFloorMeshSquares) {
-        addTriIndices(square);
+        addSquareTris(square);
     }
+
+    // Create indices for triangles.
+    for (const Triangle &tri : mFunctionMeshTriangles) {
+        addTriIndices(tri);
+    }
+
+    setFuncVertTBNs();
 }
