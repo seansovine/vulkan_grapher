@@ -462,7 +462,7 @@ void FunctionMesh::computeVerticesAndIndices() {
         if (shouldRefine(square)) {
             refine(square);
         }
-        auto _ = square.populateRefinements();
+        auto &_ = square.populateRefinements();
 
         // NOTE: This depends on the ordering of squares across
         // columns left-to-right then down rows top-to-bottom.
