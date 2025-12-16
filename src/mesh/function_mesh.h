@@ -86,7 +86,7 @@ class FunctionMesh {
     static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
 
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
-    static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 25.0;
+    static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
 
 public:
     explicit FunctionMesh(const F func)
@@ -303,7 +303,7 @@ private:
     static constexpr glm::vec3 REFINE_DEBUG_COLOR = {0.0f, 1.0f, 0.0f};
 
     // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int mNumCells = 50;
+    static constexpr int mNumCells = 60;
 
     // Ensure we don't overlow our index type: This check is
     // necessary, but not sufficient, because of mesh refinement.

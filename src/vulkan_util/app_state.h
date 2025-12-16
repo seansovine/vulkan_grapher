@@ -9,6 +9,9 @@ struct AppState {
     bool wireframe = false;
 
     glm::vec3 graphColor = {0.070f, 0.336f, 0.594f};
+
+    float metallic  = 0.5;
+    float roughness = 0.5;
 };
 
 #endif // APP_STATE_H_

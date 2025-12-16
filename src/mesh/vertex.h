@@ -98,7 +98,7 @@ struct IndexedMesh {
 
         static constexpr float ROT_RADS_PER_SEC = 22.5f;
         static constexpr float DIST_COMP        = 1.5f;
-        static constexpr glm::vec3 VIEWER_POS   = glm::vec3(DIST_COMP, DIST_COMP, DIST_COMP);
+        static constexpr glm::vec3 VIEWER_POS   = glm::vec3(0.0f, DIST_COMP, DIST_COMP);
 
         TransformsUniform ubo{};
 
@@ -115,6 +115,9 @@ struct IndexedMesh {
         ubo.meshColor = appState.graphColor;
         // Set viewer position; constant for now.
         ubo.viewerPos = VIEWER_POS;
+
+        ubo.metallic  = appState.metallic;
+        ubo.roughness = appState.roughness;
 
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }

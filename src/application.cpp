@@ -70,9 +70,7 @@ void Application::initUI() {
     ImGui_ImplVulkan_Init(&init_info);
 
     // Set ui callbacks on Vulkan wrapper.
-    vulkan.setUIDeinitCallback([this](VkDevice logicalDevice) {
-        imGuiVulkan.deinit(logicalDevice); //
-    });
+    vulkan.setUIDeinitCallback([this](VkDevice logicalDevice) { imGuiVulkan.deinit(logicalDevice); });
     vulkan.setUIDrawCallback(
         [this](uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
             return imGuiVulkan.recordDrawCommands(currentFrame, imageIndex, swapchainExtent);
@@ -92,7 +90,7 @@ void Application::initVulkan() {
             return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
         };
         static auto sinc = [](double x, double y) -> double {
-            double scale = 50; // 100
+            double scale = 30; // 100
             double mag   = scale * std::sqrt(x * x + y * y);
             return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
         };
@@ -163,6 +161,7 @@ void Application::drawUI() {
 
     // Add some vertical space.
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
     if (ImGui::Button("Toggle Object Rotation")) {
         appState.rotating = !appState.rotating;
     }
@@ -170,10 +169,18 @@ void Application::drawUI() {
         appState.wireframe = !appState.wireframe;
     }
 
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
     // PBR graph color.
     ImGui::SliderFloat("Graph color R", &appState.graphColor.r, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Graph color G", &appState.graphColor.g, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Graph color B", &appState.graphColor.b, 0.0f, 1.0f, "%.2f");
+
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+    // PBR material parameters.
+    ImGui::SliderFloat("Metallic", &appState.metallic, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Roughness", &appState.roughness, 0.0f, 1.0f, "%.2f");
 
     ImGui::End();
     ImGui::Render();

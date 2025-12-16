@@ -2,7 +2,7 @@ format:
 	@find src/ -regex '.*\.\(cpp\|hpp\|c\|h\|cc\|hh\|cxx\|hxx\)' -exec clang-format -style=file -i {} \;
 
 .PHONY: build
-build: configure
+build: src
 	@cmake --build build/
 
 .PHONY: configure
