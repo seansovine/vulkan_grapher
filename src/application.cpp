@@ -94,17 +94,18 @@ void Application::initVulkan() {
             double mag   = scale * std::sqrt(x * x + y * y);
             return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
         };
+
         static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
             return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
         };
 
-        FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
         std::cout << "Building function mesh." << std::endl;
+        FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
         std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
         std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
+
         meshesToRender = {IndexedMesh{mesh.floorVertices(), mesh.meshIndices()},
                           IndexedMesh{mesh.functionVertices(), mesh.meshIndices()}};
-
     } else {
         meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
     }
@@ -118,12 +119,11 @@ void Application::initWindow() {
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
     window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Vulkan Grapher", nullptr, nullptr);
-    glfwSetKeyCallback(window, keyCallback);
 
     // Have GLFW store a pointer to this class instance for use in callbacks.
     glfwSetWindowUserPointer(window, this);
+    glfwSetKeyCallback(window, keyCallback);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
     if (!window) {

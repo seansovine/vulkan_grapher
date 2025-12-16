@@ -41,6 +41,7 @@ private:
     bool framebufferResized = false;
 
     GLFWwindow *window;
+
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
 };

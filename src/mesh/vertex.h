@@ -10,13 +10,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
 struct Vertex {
     glm::vec3 pos;

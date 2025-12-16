@@ -29,14 +29,19 @@ of the magnitude of its second derivatives. If either of these exceeds a predefi
 then the cell is selected for refinement. In the future we'll add these threshold parameters
 to the UI for user selection.
 
-## What we have now
+## PBR material shading
 
-We have code that renders a function -- which currently must be defined in the code --
-using a basic mesh comprised of a square tessellation with the mesh refinement algorithm
-described above.
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_pbr_blue_2025-12-15.png" alt="drawing" width="600" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
 
-The UI has a feature to toggle rotation of the graph around the y-axis (which is the "up"
-axis in most computer graphics APIs).
+There is now the option to render the graph surface as a solid with basic PBR material shading.
+The current version of this closely follows the examples from the excellent site
+[learnopengl.com](https://learnopengl.com/).
+
+The GUI now also features sliders to adjust the surface color and its PBR metallic and roughness
+properties. The lighting effects in this shading reveal some of the shortcomings of our
+current meshing approach, which we'll work on improving.
 
 ## To do next
 
@@ -44,11 +49,11 @@ Next we will add these graphing features:
 
 1. Either find or write a mathematical expression parsing library in C/C++.
 
-2. Add more sophisticated rendering features, starting with lighting.
+2. Add better user interaction features like mouse control of the view.
 
-3. Add better user interaction features like mouse control of the view.
+3. Add user control of graphing and render parameters.
 
-4. Add user control of graphing and render parameters.
+4. Improve the mesh quality, especially for graphs with round contours.
 
 ## Sources and credits
 

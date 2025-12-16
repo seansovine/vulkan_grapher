@@ -482,7 +482,6 @@ void FunctionMesh::computeVerticesAndIndices() {
         }
     }
 
-    // Create triangles for squares.
     mMeshIndices.clear();
     // NOTE: This will not be accurate if refinement happens.
     mMeshIndices.reserve(mFloorMeshSquares.size() * 12);
@@ -490,6 +489,7 @@ void FunctionMesh::computeVerticesAndIndices() {
     mFunctionMeshTriangles.resize(mFloorMeshVertices.size());
     mVertexTriangles.resize(mFloorMeshVertices.size());
 
+    // Create triangles for squares.
     for (auto &square : mFloorMeshSquares) {
         addSquareTris(square);
     }
