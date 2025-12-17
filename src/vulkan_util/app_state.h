@@ -5,8 +5,9 @@
 #include <glm/glm.hpp>
 
 struct AppState {
-    bool rotating  = true;
-    bool wireframe = false;
+    bool rotating        = true;
+    bool wireframe       = false;
+    bool pbrFragPipeline = true;
 
     glm::vec3 graphColor = {0.070f, 0.336f, 0.594f};
 

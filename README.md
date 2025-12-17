@@ -32,7 +32,7 @@ to the UI for user selection.
 ## PBR material shading
 
 <p align="center" margin="20px">
-	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_pbr_blue_2025-12-15.png" alt="drawing" width="600" style="padding-top: 10px; padding-bottom: 10px"/>
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_frag_pbr_2_2025-12-16.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
 There is now the option to render the graph surface as a solid with basic PBR material shading.
@@ -41,7 +41,9 @@ The current version of this closely follows the examples from the excellent site
 
 The GUI now also features sliders to adjust the surface color and its PBR metallic and roughness
 properties. The lighting effects in this shading reveal some of the shortcomings of our
-current meshing approach, which we'll work on improving.
+current meshing approach, which we'll work on improving. However, moving the PBR computations
+to the fragment shader has also drastically improved this, by reducing the effects of fragment
+interpolation.
 
 ## To do next
 
@@ -53,7 +55,7 @@ Next we will add these graphing features:
 
 3. Add user control of graphing and render parameters.
 
-4. Improve the mesh quality, especially for graphs with round contours.
+4. Keep looking at ways to improve the mesh quality for round surfaces.
 
 ## Sources and credits
 

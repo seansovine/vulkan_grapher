@@ -30,10 +30,6 @@ private:
     void drawUI();
     void drawFrame();
 
-    // Toggles between the two example vertex sets updates the
-    // vertex buffer with data from the new set after toggling.
-    void toggleMesh();
-
 private:
     const uint32_t INITIAL_WINDOW_WIDTH  = 1200;
     const uint32_t INITIAL_WINDOW_HEIGHT = 900;

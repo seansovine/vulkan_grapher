@@ -97,6 +97,7 @@ void GlfwVulkanWrapper::deinit() {
 
     vkDestroyPipeline(device, wireframePipeline, nullptr);
     vkDestroyPipeline(device, pbrPipeline, nullptr);
+    vkDestroyPipeline(device, pbr2Pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
@@ -802,7 +803,7 @@ void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMesh &mesh) {
     uboLayoutBinding.descriptorCount    = 1;
     uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -991,6 +992,42 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     pipelineInfo.pStages = shaderStages;
 
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pbrPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Unable to create graphics pipeline!");
+    }
+
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
+
+    // Create second PBR pipeline.
+
+    // NOTE: This is a version of the previous PBR pipeline that
+    // moves the PBR computations to the fragment shader. This
+    // reduces interpolation error and dramatically improves the
+    // surface lighting on reasonably-sized meshes.
+
+    vertShaderCode = loadShader("shaders/pbr2_vert.spv");
+    fragShaderCode = loadShader("shaders/pbr2_frag.spv");
+
+    vertShaderModule = createShaderModule(vertShaderCode);
+    fragShaderModule = createShaderModule(fragShaderCode);
+
+    vertShaderStageInfo        = {};
+    vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName  = "main";
+
+    fragShaderStageInfo        = {};
+    fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName  = "main";
+
+    shaderStages[0]      = vertShaderStageInfo;
+    shaderStages[1]      = fragShaderStageInfo;
+    pipelineInfo.pStages = shaderStages;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pbr2Pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Unable to create graphics pipeline!");
     }
 
@@ -1217,7 +1254,8 @@ void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandB
             if (i == static_cast<uint32_t>(MeshStage::DRAW_FLOOR)) {
                 vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipeline);
             } else if (i == static_cast<uint32_t>(MeshStage::DRAW_GRAPH) && !appState.wireframe) {
-                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrPipeline);
+                VkPipeline pipeline = appState.pbrFragPipeline ? pbr2Pipeline : pbrPipeline;
+                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             }
 
             const auto &mesh         = currentMeshes[i];

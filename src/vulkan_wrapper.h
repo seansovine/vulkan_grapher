@@ -50,6 +50,7 @@ private:
     VkPipelineLayout pipelineLayout;
     VkPipeline wireframePipeline;
     VkPipeline pbrPipeline;
+    VkPipeline pbr2Pipeline;
 
     enum class MeshStage : uint8_t {
         DRAW_FLOOR = 0,

@@ -64,21 +64,32 @@ void Application::initUI() {
     ImGui::StyleColorsDark();
 
     imGuiVulkan.init(vulkan);
+    ImGui_ImplVulkan_InitInfo init_info = vulkan.imGuiInitInfo(imGuiVulkan.uiDescriptorPool, imGuiVulkan.uiRenderPass);
 
     ImGui_ImplGlfw_InitForVulkan(window, true);
-    ImGui_ImplVulkan_InitInfo init_info = vulkan.imGuiInitInfo(imGuiVulkan.uiDescriptorPool, imGuiVulkan.uiRenderPass);
     ImGui_ImplVulkan_Init(&init_info);
 
     // Set ui callbacks on Vulkan wrapper.
-    vulkan.setUIDeinitCallback([this](VkDevice logicalDevice) { imGuiVulkan.deinit(logicalDevice); });
-    vulkan.setUIDrawCallback(
+
+    vulkan.setUIDeinitCallback( //
+        [this](VkDevice logicalDevice) {
+            imGuiVulkan.deinit(logicalDevice); //
+        });
+
+    vulkan.setUIDrawCallback( //
         [this](uint32_t currentFrame, uint32_t imageIndex, const VkExtent2D &swapchainExtent) -> VkCommandBuffer {
             return imGuiVulkan.recordDrawCommands(currentFrame, imageIndex, swapchainExtent);
         });
-    vulkan.setCreateUIFrameBuffersCallback(
-        [this](GlfwVulkanWrapper &inVulkan) { this->imGuiVulkan.createFrameBuffers(inVulkan); });
-    vulkan.setDestroyUIFrameBuffersCallback(
-        [this](GlfwVulkanWrapper &inVulkan) { this->imGuiVulkan.destroyFrameBuffers(inVulkan); });
+
+    vulkan.setCreateUIFrameBuffersCallback( //
+        [this](GlfwVulkanWrapper &inVulkan) {
+            this->imGuiVulkan.createFrameBuffers(inVulkan); //
+        });
+
+    vulkan.setDestroyUIFrameBuffersCallback( //
+        [this](GlfwVulkanWrapper &inVulkan) {
+            this->imGuiVulkan.destroyFrameBuffers(inVulkan); //
+        });
 }
 
 void Application::initVulkan() {
@@ -89,23 +100,26 @@ void Application::initVulkan() {
         static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
             return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
         };
+
         static auto sinc = [](double x, double y) -> double {
             double scale = 30; // 100
             double mag   = scale * std::sqrt(x * x + y * y);
             return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
         };
-
         static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
             return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
         };
 
         std::cout << "Building function mesh." << std::endl;
+
         FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
+
         std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
         std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
 
         meshesToRender = {IndexedMesh{mesh.floorVertices(), mesh.meshIndices()},
                           IndexedMesh{mesh.functionVertices(), mesh.meshIndices()}};
+
     } else {
         meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
     }
@@ -153,7 +167,7 @@ void Application::drawUI() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    static float f = 0.0f;
+    // static float f = 0.0f;
 
     ImGui::Begin("Settings");
     ImGui::Text("Average framerate: %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
@@ -167,6 +181,9 @@ void Application::drawUI() {
     }
     if (ImGui::Button("Toggle Wireframe Graph")) {
         appState.wireframe = !appState.wireframe;
+    }
+    if (ImGui::Button("Toggle PBR in Vertex")) {
+        appState.pbrFragPipeline = !appState.pbrFragPipeline;
     }
 
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
@@ -184,10 +201,6 @@ void Application::drawUI() {
 
     ImGui::End();
     ImGui::Render();
-}
-
-void Application::toggleMesh() {
-    // TODO
 }
 
 void Application::drawFrame() {
