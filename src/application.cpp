@@ -2,7 +2,7 @@
 
 #include "app_state.h"
 #include "function_mesh.h"
-#include "vertex.h"
+#include "mesh.h"
 #include "vulkan_wrapper.h"
 
 #include <imgui/backends/imgui_impl_glfw.h>

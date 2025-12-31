@@ -1,7 +1,7 @@
 #ifndef FUNCTION_MESH_H_
 #define FUNCTION_MESH_H_
 
-#include "vertex.h"
+#include "mesh.h"
 
 #include <glm/fwd.hpp>
 
@@ -79,6 +79,7 @@ class FunctionMesh {
     using F = double (*)(double, double);
 
     static constexpr bool USE_NEW_MESH     = true;
+    static constexpr bool SHOW_REFINEMENT  = true;
     static constexpr bool DEBUG_REFINEMENT = false;
 
     // Currently valid values are 0 and 1; we may

@@ -1,5 +1,6 @@
 #include "function_mesh.h"
-#include "vertex.h"
+
+#include "mesh.h"
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
@@ -184,7 +185,7 @@ void FunctionMesh::addFloorMeshVertex(float x, float z) {
 }
 
 void FunctionMesh::refine(Square &square) {
-    if constexpr (DEBUG_REFINEMENT) {
+    if constexpr (SHOW_REFINEMENT) {
         mFunctionMeshVertices[square.topLeftIdx].color     = REFINE_DEBUG_COLOR;
         mFunctionMeshVertices[square.topRightIdx].color    = REFINE_DEBUG_COLOR;
         mFunctionMeshVertices[square.bottomRightIdx].color = REFINE_DEBUG_COLOR;
@@ -200,7 +201,7 @@ void FunctionMesh::refine(Square &square) {
     float rightMiddle[2] = {square.mBtmRight[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
 
     glm::vec3 funcColor = FUNCT_COLOR;
-    if (DEBUG_REFINEMENT) {
+    if (SHOW_REFINEMENT) {
         funcColor = REFINE_DEBUG_COLOR;
     }
 

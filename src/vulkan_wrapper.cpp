@@ -7,9 +7,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "mesh.h"
 #include "shader_util.h"
 #include "uniforms.h"
-#include "vertex.h"
 #include "vulkan_debug.h"
 #include "vulkan_helper.h"
 

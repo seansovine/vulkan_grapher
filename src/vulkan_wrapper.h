@@ -8,7 +8,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "app_state.h"
-#include "vertex.h"
+#include "mesh.h"
 
 #include <cstdint>
 #include <functional>
