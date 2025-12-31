@@ -1,5 +1,6 @@
 #include "application.h"
 
+#include "app_state.h"
 #include "function_mesh.h"
 #include "vertex.h"
 #include "vulkan_wrapper.h"
@@ -13,6 +14,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -92,39 +94,59 @@ void Application::initUI() {
         });
 }
 
-void Application::initVulkan() {
-    static constexpr bool RENDER_FUNCTION = true;
+void Application::populateFunctionMeshes() {
+    static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
+        return 0.75 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
+    };
 
-    std::vector<IndexedMesh> meshesToRender;
-    if (RENDER_FUNCTION) {
-        static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
-            return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
-        };
+    static auto sinc = [](double x, double y) -> double {
+        double scale = 30; // 100
+        double mag   = scale * std::sqrt(x * x + y * y);
+        return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
+    };
+    static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
+        return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
+    };
 
-        static auto sinc = [](double x, double y) -> double {
-            double scale = 30; // 100
-            double mag   = scale * std::sqrt(x * x + y * y);
-            return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
-        };
-        static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
-            return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
-        };
-
-        std::cout << "Building function mesh." << std::endl;
-
-        FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
-
+    auto populate = [this](double (*func)(double, double)) {
+        FunctionMesh mesh{func};
         std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
         std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
 
         meshesToRender = {IndexedMesh{mesh.floorVertices(), mesh.meshIndices()},
                           IndexedMesh{mesh.functionVertices(), mesh.meshIndices()}};
+    };
+
+    std::cout << "Building function meshes." << std::endl;
+
+    switch (appState.testFunc) {
+    case TestFunc::Parabolic: {
+        populate(TEST_FUNCTION_PARABOLIC);
+        break;
+    }
+    case TestFunc::ShiftedSinc: {
+        populate(TEST_FUNCTION_SHIFTED_SINC);
+        break;
+    }
+    default: {
+        throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
+    }
+    }
+}
+
+void Application::initVulkan() {
+    // Set false for very basic mesh debugging.
+    static constexpr bool RENDER_FUNCTION = true;
+
+    if (RENDER_FUNCTION) {
+        populateFunctionMeshes();
 
     } else {
         meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
     }
 
     vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, std::move(meshesToRender));
+    meshesToRender = {};
 }
 
 void Application::initWindow() {
@@ -162,12 +184,15 @@ void Application::run() {
     vulkan.waitForDeviceIdle();
 }
 
+void Application::drawFrame() {
+    vulkan.drawFrame(appState, framebufferResized);
+    framebufferResized = false;
+}
+
 void Application::drawUI() {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-
-    // static float f = 0.0f;
 
     ImGui::Begin("Settings");
     ImGui::Text("Average framerate: %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
@@ -185,6 +210,11 @@ void Application::drawUI() {
     if (ImGui::Button("Toggle PBR in Vertex")) {
         appState.pbrFragPipeline = !appState.pbrFragPipeline;
     }
+    if (ImGui::Button("Toggle Test Function")) {
+        appState.toggleTestFunc();
+        populateFunctionMeshes();
+        vulkan.updateMeshes(meshesToRender);
+    }
 
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
@@ -201,9 +231,4 @@ void Application::drawUI() {
 
     ImGui::End();
     ImGui::Render();
-}
-
-void Application::drawFrame() {
-    vulkan.drawFrame(appState, framebufferResized);
-    framebufferResized = false;
 }

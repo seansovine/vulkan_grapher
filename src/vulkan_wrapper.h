@@ -93,6 +93,8 @@ public:
     // Initialization functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::vector<IndexedMesh> &&meshData);
 
+    void updateMeshes(const std::vector<IndexedMesh> &meshData);
+
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
     }

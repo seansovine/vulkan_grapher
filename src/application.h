@@ -8,12 +8,14 @@
 #include "vulkan_util/app_state.h"
 #include "vulkan_wrapper.h"
 
+#include <cstdint>
 #include <cstring>
 
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 
     AppState appState;
+    std::vector<IndexedMesh> meshesToRender;
 
 public:
     Application();
@@ -30,8 +32,10 @@ private:
     void drawUI();
     void drawFrame();
 
+    void populateFunctionMeshes();
+
 private:
-    const uint32_t INITIAL_WINDOW_WIDTH  = 1200;
+    const uint32_t INITIAL_WINDOW_WIDTH  = 1500;
     const uint32_t INITIAL_WINDOW_HEIGHT = 900;
 
     bool framebufferResized = false;

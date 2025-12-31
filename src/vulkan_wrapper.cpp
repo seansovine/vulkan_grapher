@@ -28,6 +28,8 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     windowHeight = inWindowHeight;
 
     currentMeshes = meshData;
+    // For now assume just floor and func meshes; can relax later.
+    assert(currentMeshes.size() == 2);
 
     createInstance();
     setupDebugMessenger();
@@ -62,6 +64,31 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     }
     createCommandBuffers();
     createSyncObjects();
+}
+
+void GlfwVulkanWrapper::updateMeshes(const std::vector<IndexedMesh> &newMeshData) {
+    // For now assume exactly floor and func meshes.
+    assert(newMeshData.size() == 2 && currentMeshes.size() == 2);
+
+    for (uint8_t i = 0; i < 2; i++) {
+        const auto &newMesh = newMeshData[i];
+        auto &currentMesh   = currentMeshes[i];
+
+        // Destroys existing vertex and index buffers.
+        currentMesh.destroyBuffers(device);
+
+        currentMesh.vertices = newMesh.vertices;
+        currentMesh.indices  = newMesh.indices;
+
+        createVertexBuffer(currentMesh.vertices, currentMesh.vertexBuffer, currentMesh.vertexBufferMemory);
+        assert(currentMesh.vertexBuffer != VK_NULL_HANDLE);
+        createIndexBuffer(currentMesh.indices, currentMesh.indexBuffer, currentMesh.indexBufferMemory);
+        assert(currentMesh.indexBuffer != VK_NULL_HANDLE);
+
+        // Note that the copy commands here use vkQueueWaitIdle to copy
+        // sequentially. This should be fine here, as generating the mesh
+        // should take longer than copying it to the device.
+    }
 }
 
 void GlfwVulkanWrapper::recreateSwapchain() {

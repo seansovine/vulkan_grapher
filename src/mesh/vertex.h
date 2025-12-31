@@ -122,14 +122,18 @@ struct IndexedMesh {
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
-    void destroyResources(VkDevice device) {
-        uniformInfo.destroy(device);
-
+    void destroyBuffers(VkDevice device) {
         vkDestroyBuffer(device, vertexBuffer, nullptr);
         vkFreeMemory(device, vertexBufferMemory, nullptr);
 
         vkDestroyBuffer(device, indexBuffer, nullptr);
         vkFreeMemory(device, indexBufferMemory, nullptr);
+    }
+
+    void destroyResources(VkDevice device) {
+        uniformInfo.destroy(device);
+
+        destroyBuffers(device);
 
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
