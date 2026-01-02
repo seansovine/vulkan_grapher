@@ -3,11 +3,12 @@
 
 #include "mesh.h"
 
+#include <cstddef>
 #include <glm/fwd.hpp>
 
 #include <cassert>
 #include <cstdint>
-#include <ostream>
+#include <iostream>
 #include <set>
 #include <vector>
 
@@ -24,7 +25,12 @@ struct Square {
     // Neighbors in same level of grid.
     // For sharing vertices via indices.
     Square *northNeighbor = nullptr;
+    Square *southNeighbor = nullptr;
     Square *westNeighbor  = nullptr;
+    Square *eastNeighbor  = nullptr;
+
+    // Parent square, if this is a refinement.
+    Square *parent = nullptr;
 
     // TODO: We need to add additional edge vertices/
     // triangles when neighbor squares get refined.
@@ -49,10 +55,10 @@ struct Square {
     }
 
     struct EdgeRefinements {
-        std::vector<uint16_t> northRefinements;
-        std::vector<uint16_t> westRefinements;
-        std::vector<uint16_t> southRefinements;
-        std::vector<uint16_t> eastRefinements;
+        std::vector<uint16_t> north;
+        std::vector<uint16_t> west;
+        std::vector<uint16_t> south;
+        std::vector<uint16_t> east;
     };
     EdgeRefinements edgeRefinements;
 
@@ -84,7 +90,7 @@ class FunctionMesh {
 
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 2;
 
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
@@ -92,8 +98,13 @@ class FunctionMesh {
 public:
     explicit FunctionMesh(const F func)
         : mFunc(func) {
-        assert(MAX_REFINEMENT_DEPTH <= 1);
+
+        auto start = std::chrono::high_resolution_clock::now();
         generateMesh();
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        std::cout << "Mesh generation time: " << duration.count() << " ms." << std::endl;
     }
 
     void generateMesh() {
@@ -134,25 +145,25 @@ public:
     std::basic_ostream<char> &debugRefinements(std::basic_ostream<char> &debugStrm, const Square &square) {
         std::string indent(square.depth * 4, ' ');
         debugStrm << indent << " = North refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.northRefinements) {
+        for (uint16_t refinmnt : square.edgeRefinements.north) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = West refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.westRefinements) {
+        for (uint16_t refinmnt : square.edgeRefinements.west) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = South refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.southRefinements) {
+        for (uint16_t refinmnt : square.edgeRefinements.south) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = East refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.eastRefinements) {
+        for (uint16_t refinmnt : square.edgeRefinements.east) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
@@ -200,6 +211,12 @@ public:
 
 private:
     void computeVerticesAndIndices();
+
+    void syncEdgeRefinements(Square &square);
+
+    void syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16_t> &from);
+
+    void syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_t> &from);
 
     void buildFloorMesh();
 
@@ -299,9 +316,10 @@ private:
     F mFunc;
 
     // Default RGB colors for floor and function meshes.
-    static constexpr glm::vec3 FLOOR_COLOR        = {0.556f, 0.367f, 0.076f};
-    static constexpr glm::vec3 FUNCT_COLOR        = {0.070f, 0.336f, 0.594f};
-    static constexpr glm::vec3 REFINE_DEBUG_COLOR = {0.0f, 1.0f, 0.0f};
+    static constexpr glm::vec3 FLOOR_COLOR         = {0.556f, 0.367f, 0.076f};
+    static constexpr glm::vec3 FUNCT_COLOR         = {0.070f, 0.336f, 0.594f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR1 = {0.0f, 1.0f, 0.0f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR2 = {1.0f, 0.5f, 0.0f};
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int mNumCells = 60;
@@ -316,6 +334,12 @@ private:
 
     // Squares that make up x,y-plane mesh.
     std::vector<Square> mFloorMeshSquares = {};
+    // IMPORTANT: Pointers to these elements are stored in various places.
+    //            So once assigned, it must never reallocate!
+    //
+    // This means the top-level grid shape is fixed, and that grid squares
+    // are the owners of their child squares added during refinement.
+
     // Vertices of triangular tessellation built from squares.
     std::vector<Vertex> mFloorMeshVertices = {};
     // Tessellation vertices with heights from function values.

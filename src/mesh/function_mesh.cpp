@@ -2,6 +2,7 @@
 
 #include "mesh.h"
 
+#include <algorithm>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 
@@ -15,13 +16,15 @@
 
 // Square implementations.
 
+// Postcondition: Edge refinments vectors will be populated in appropriate
+//                order for the orientation of each edge.
 const Square::EdgeRefinements &Square::populateRefinements() {
     if (!hasChildren()) {
         edgeRefinements = {
-            .northRefinements = {topLeftIdx, topRightIdx},
-            .westRefinements  = {topLeftIdx, bottomLeftIdx},
-            .southRefinements = {bottomLeftIdx, bottomRightIdx},
-            .eastRefinements  = {topRightIdx, bottomRightIdx},
+            .north = {topLeftIdx, topRightIdx},
+            .west  = {topLeftIdx, bottomLeftIdx},
+            .south = {bottomLeftIdx, bottomRightIdx},
+            .east  = {topRightIdx, bottomRightIdx},
         };
         return edgeRefinements;
     }
@@ -30,41 +33,41 @@ const Square::EdgeRefinements &Square::populateRefinements() {
 
     // Absorb refinements from children.
 
-    Square &topLeftChild                  = children[0];
-    const EdgeRefinements *tlcRefinements = &topLeftChild.populateRefinements();
-    for (uint32_t i = 0; i < tlcRefinements->northRefinements.size() - 1; i++) {
-        edgeRefinements.northRefinements.push_back(tlcRefinements->northRefinements[i]);
+    Square &topLeftChild                    = children[0];
+    const EdgeRefinements *childRefinements = &topLeftChild.populateRefinements();
+    for (uint32_t i = 0; i < childRefinements->north.size() - 1; i++) {
+        edgeRefinements.north.push_back(childRefinements->north[i]);
     }
-    for (uint32_t i = 0; i < tlcRefinements->westRefinements.size() - 1; i++) {
-        edgeRefinements.westRefinements.push_back(tlcRefinements->westRefinements[i]);
+    for (uint32_t i = 0; i < childRefinements->west.size() - 1; i++) {
+        edgeRefinements.west.push_back(childRefinements->west[i]);
     }
     // Omit last to avoid duplicates.
 
     Square &topRightChild = children[1];
-    tlcRefinements        = &topRightChild.populateRefinements();
-    for (uint32_t i = 0; i < tlcRefinements->northRefinements.size(); i++) {
-        edgeRefinements.northRefinements.push_back(tlcRefinements->northRefinements[i]);
+    childRefinements      = &topRightChild.populateRefinements();
+    for (uint32_t i = 0; i < childRefinements->north.size(); i++) {
+        edgeRefinements.north.push_back(childRefinements->north[i]);
     }
-    for (uint32_t i = 0; i < tlcRefinements->eastRefinements.size() - 1; i++) {
-        edgeRefinements.eastRefinements.push_back(tlcRefinements->eastRefinements[i]);
+    for (uint32_t i = 0; i < childRefinements->east.size() - 1; i++) {
+        edgeRefinements.east.push_back(childRefinements->east[i]);
     }
 
     Square &bottomLeftChild = children[2];
-    tlcRefinements          = &bottomLeftChild.populateRefinements();
-    for (uint32_t i = 0; i < tlcRefinements->southRefinements.size() - 1; i++) {
-        edgeRefinements.southRefinements.push_back(tlcRefinements->southRefinements[i]);
+    childRefinements        = &bottomLeftChild.populateRefinements();
+    for (uint32_t i = 0; i < childRefinements->south.size() - 1; i++) {
+        edgeRefinements.south.push_back(childRefinements->south[i]);
     }
-    for (uint32_t i = 0; i < tlcRefinements->westRefinements.size(); i++) {
-        edgeRefinements.westRefinements.push_back(tlcRefinements->westRefinements[i]);
+    for (uint32_t i = 0; i < childRefinements->west.size(); i++) {
+        edgeRefinements.west.push_back(childRefinements->west[i]);
     }
 
     Square &bottomRightChild = children[3];
-    tlcRefinements           = &bottomRightChild.populateRefinements();
-    for (uint32_t i = 0; i < tlcRefinements->southRefinements.size(); i++) {
-        edgeRefinements.southRefinements.push_back(tlcRefinements->southRefinements[i]);
+    childRefinements         = &bottomRightChild.populateRefinements();
+    for (uint32_t i = 0; i < childRefinements->south.size(); i++) {
+        edgeRefinements.south.push_back(childRefinements->south[i]);
     }
-    for (uint32_t i = 0; i < tlcRefinements->eastRefinements.size(); i++) {
-        edgeRefinements.eastRefinements.push_back(tlcRefinements->eastRefinements[i]);
+    for (uint32_t i = 0; i < childRefinements->east.size(); i++) {
+        edgeRefinements.east.push_back(childRefinements->east[i]);
     }
 
     return edgeRefinements;
@@ -79,27 +82,33 @@ void FunctionMesh::buildFloorMesh() {
     for (int i = 1; i <= mNumCells; i++) {
         for (int j = 1; j <= mNumCells; j++) {
             // clang-format off
-                Square square{
-                  .mTopLeft ={
+            Square square{
+                .mTopLeft ={
                     static_cast<float>((j - 1) * width), //
                     static_cast<float>((i - 1) * width), //
-                  },
-                  .mBtmRight = {
+                },
+                .mBtmRight = {
                     static_cast<float>(j * width), //
                     static_cast<float>(i * width), //
-                  }
-                };
+                }
+            };
             // clang-format on
 
+            // The ONLY place where we insert into this vector.
+            mFloorMeshSquares.push_back(square);
+            Square &newSquare = mFloorMeshSquares.back();
+
+            // Assign neighbors in top-level grid.
             if (j >= 2) {
-                square.westNeighbor = &mFloorMeshSquares.back();
+                Square &westNeighbor      = mFloorMeshSquares.at(mFloorMeshSquares.size() - 2);
+                newSquare.westNeighbor    = &westNeighbor;
+                westNeighbor.eastNeighbor = &newSquare;
             }
             if (i >= 2) {
-                Square &northNeighbor = mFloorMeshSquares[(i - 2) * mNumCells + (j - 1)];
-                square.northNeighbor  = &northNeighbor;
+                Square &northNeighbor       = mFloorMeshSquares.at((i - 2) * mNumCells + (j - 1));
+                newSquare.northNeighbor     = &northNeighbor;
+                northNeighbor.southNeighbor = &newSquare;
             }
-
-            mFloorMeshSquares.push_back(square);
         }
     }
 }
@@ -185,12 +194,26 @@ void FunctionMesh::addFloorMeshVertex(float x, float z) {
 }
 
 void FunctionMesh::refine(Square &square) {
+    glm::vec3 funcColor = FUNCT_COLOR;
+
     if constexpr (SHOW_REFINEMENT) {
-        mFunctionMeshVertices[square.topLeftIdx].color     = REFINE_DEBUG_COLOR;
-        mFunctionMeshVertices[square.topRightIdx].color    = REFINE_DEBUG_COLOR;
-        mFunctionMeshVertices[square.bottomRightIdx].color = REFINE_DEBUG_COLOR;
-        mFunctionMeshVertices[square.bottomLeftIdx].color  = REFINE_DEBUG_COLOR;
-        mFunctionMeshVertices[square.centerIdx].color      = REFINE_DEBUG_COLOR;
+
+        switch (square.depth) {
+        case 0: {
+            funcColor = REFINE_DEBUG_COLOR1;
+            break;
+        }
+        default: {
+            funcColor = REFINE_DEBUG_COLOR2;
+            break;
+        }
+        }
+
+        mFunctionMeshVertices[square.topLeftIdx].color     = funcColor;
+        mFunctionMeshVertices[square.topRightIdx].color    = funcColor;
+        mFunctionMeshVertices[square.bottomRightIdx].color = funcColor;
+        mFunctionMeshVertices[square.bottomLeftIdx].color  = funcColor;
+        mFunctionMeshVertices[square.centerIdx].color      = funcColor;
     }
 
     float center[2]      = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]),
@@ -199,11 +222,6 @@ void FunctionMesh::refine(Square &square) {
     float btmMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mBtmRight[1]};
     float leftMiddle[2]  = {square.mTopLeft[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
     float rightMiddle[2] = {square.mBtmRight[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
-
-    glm::vec3 funcColor = FUNCT_COLOR;
-    if (SHOW_REFINEMENT) {
-        funcColor = REFINE_DEBUG_COLOR;
-    }
 
     auto addVert = [this, funcColor](float coords[2]) -> uint16_t {
         addFloorMeshVertex(coords[0], coords[1]);
@@ -240,12 +258,15 @@ void FunctionMesh::refine(Square &square) {
 
         .depth = childDepth,
 
+        .parent = &square,
+
         .topLeftIdx     = square.topLeftIdx,
         .topRightIdx    = topMidIdx,
         .bottomRightIdx = square.centerIdx,
         .bottomLeftIdx  = leftMidIdx,
         .centerIdx      = newCenterIdx,
     });
+    Square &topLeftChild = square.children.back();
 
     // Add top right child.
 
@@ -259,7 +280,8 @@ void FunctionMesh::refine(Square &square) {
 
         .depth = childDepth,
 
-        .westNeighbor = &square.children.back(),
+        .westNeighbor = &topLeftChild,
+        .parent       = &square,
 
         .topLeftIdx     = topMidIdx,
         .topRightIdx    = square.topRightIdx,
@@ -267,6 +289,8 @@ void FunctionMesh::refine(Square &square) {
         .bottomLeftIdx  = square.centerIdx,
         .centerIdx      = newCenterIdx2,
     });
+    Square &topRightChild     = square.children.back();
+    topLeftChild.eastNeighbor = &topRightChild;
 
     // Add bottom left child.
 
@@ -280,7 +304,8 @@ void FunctionMesh::refine(Square &square) {
 
         .depth = childDepth,
 
-        .northNeighbor = &square.children[square.children.size() - 2],
+        .northNeighbor = &topLeftChild,
+        .parent        = &square,
 
         .topLeftIdx     = leftMidIdx,
         .topRightIdx    = square.centerIdx,
@@ -288,6 +313,8 @@ void FunctionMesh::refine(Square &square) {
         .bottomLeftIdx  = square.bottomLeftIdx,
         .centerIdx      = newCenterIdx3,
     });
+    Square &bottomLeftChild    = square.children.back();
+    topLeftChild.southNeighbor = &bottomLeftChild;
 
     // Add bottom right child.
 
@@ -301,8 +328,9 @@ void FunctionMesh::refine(Square &square) {
 
         .depth = childDepth,
 
-        .northNeighbor = &square.children[square.children.size() - 2],
-        .westNeighbor  = &square.children.back(),
+        .northNeighbor = &topRightChild,
+        .westNeighbor  = &bottomLeftChild,
+        .parent        = &square,
 
         .topLeftIdx     = square.centerIdx,
         .topRightIdx    = rightMidIdx,
@@ -310,8 +338,16 @@ void FunctionMesh::refine(Square &square) {
         .bottomLeftIdx  = btmMidIdx,
         .centerIdx      = newCenterIdx4,
     });
+    Square &bottomRightChild     = square.children.back();
+    topRightChild.southNeighbor  = &bottomRightChild;
+    bottomLeftChild.eastNeighbor = &bottomRightChild;
 
-    // TODO: Recurse if necessary when we support deeper refinement.
+    // Recurse if necessary.
+    for (auto &child : square.children) {
+        if (shouldRefine(child)) {
+            refine(child);
+        }
+    }
 }
 
 void FunctionMesh::addSquareTris(const Square &square) {
@@ -338,25 +374,25 @@ void FunctionMesh::addSquareTris(const Square &square) {
     //       further levels of refinement.
 
     // Top triangles.
-    const auto &northRefinements = square.edgeRefinements.northRefinements;
+    const auto &northRefinements = square.edgeRefinements.north;
     for (uint32_t i = 0; i < northRefinements.size() - 1; i++) {
         addTri(square.centerIdx, northRefinements[i + 1], northRefinements[i]);
     }
 
     // Left triangles.
-    const auto &westRefinements = square.edgeRefinements.westRefinements;
+    const auto &westRefinements = square.edgeRefinements.west;
     for (uint32_t i = 0; i < westRefinements.size() - 1; i++) {
         addTri(square.centerIdx, westRefinements[i], westRefinements[i + 1]);
     }
 
     // Bottom triangles.
-    const auto &southRefinements = square.edgeRefinements.southRefinements;
+    const auto &southRefinements = square.edgeRefinements.south;
     for (uint32_t i = 0; i < southRefinements.size() - 1; i++) {
         addTri(square.centerIdx, southRefinements[i], southRefinements[i + 1]);
     }
 
     // Right triangles.
-    const auto &eastRefinements = square.edgeRefinements.eastRefinements;
+    const auto &eastRefinements = square.edgeRefinements.east;
     for (uint32_t i = 0; i < eastRefinements.size() - 1; i++) {
         addTri(square.centerIdx, eastRefinements[i + 1], eastRefinements[i]);
     }
@@ -459,28 +495,17 @@ void FunctionMesh::computeVerticesAndIndices() {
         vertex.pos.y = static_cast<float>(mFunc(vertex.pos.x, vertex.pos.z));
     }
 
+    // Refine squares and populate initial edge refinements.
     for (auto &square : mFloorMeshSquares) {
         if (shouldRefine(square)) {
             refine(square);
         }
         auto &_ = square.populateRefinements();
+    }
 
-        // NOTE: This depends on the ordering of squares across
-        // columns left-to-right then down rows top-to-bottom.
-        if (square.northNeighbor) {
-            if (!square.hasChildren() && square.northNeighbor->hasChildren()) {
-                square.edgeRefinements.northRefinements = square.northNeighbor->edgeRefinements.southRefinements;
-            } else if (square.hasChildren() && !square.northNeighbor->hasChildren()) {
-                square.northNeighbor->edgeRefinements.southRefinements = square.edgeRefinements.northRefinements;
-            }
-        }
-        if (square.westNeighbor) {
-            if (!square.hasChildren() && square.westNeighbor->hasChildren()) {
-                square.edgeRefinements.westRefinements = square.westNeighbor->edgeRefinements.eastRefinements;
-            } else if (square.hasChildren() && !square.westNeighbor->hasChildren()) {
-                square.westNeighbor->edgeRefinements.eastRefinements = square.edgeRefinements.westRefinements;
-            }
-        }
+    // Update edge refinements from neighbors to make mesh water tight.
+    for (auto &square : mFloorMeshSquares) {
+        syncEdgeRefinements(square);
     }
 
     mMeshIndices.clear();
@@ -501,4 +526,152 @@ void FunctionMesh::computeVerticesAndIndices() {
     }
 
     setFuncVertTBNs();
+}
+
+static constexpr bool DEV_REF_DEBUG = false;
+
+static std::vector<uint16_t> *getNorthNbRefinements(Square *square) {
+    while (square != nullptr) {
+        if (square->northNeighbor != nullptr) {
+            return &square->northNeighbor->edgeRefinements.south;
+        } else {
+            square = square->parent;
+        }
+    }
+    return nullptr;
+}
+static std::vector<uint16_t> *getSouthNbRefinements(Square *square) {
+    while (square != nullptr) {
+        if (square->southNeighbor != nullptr) {
+            return &square->southNeighbor->edgeRefinements.north;
+        } else {
+            square = square->parent;
+        }
+    }
+    return nullptr;
+}
+static std::vector<uint16_t> *getEastNbRefinements(Square *square) {
+    while (square != nullptr) {
+        if (square->eastNeighbor != nullptr) {
+            return &square->eastNeighbor->edgeRefinements.west;
+        } else {
+            square = square->parent;
+        }
+    }
+    return nullptr;
+}
+static std::vector<uint16_t> *getWestNbRefinements(Square *square) {
+    while (square != nullptr) {
+        if (square->westNeighbor != nullptr) {
+            return &square->westNeighbor->edgeRefinements.east;
+        } else {
+            square = square->parent;
+        }
+    }
+    return nullptr;
+}
+
+// Precondition: to and from are sorted left-to-right.
+void FunctionMesh::syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16_t> &from) {
+    assert(!to.empty());
+
+    auto getX = [this](size_t index) -> float {
+        return mFloorMeshVertices[index].pos.x; //
+    };
+
+    float leftLim  = getX(to.front());
+    float rightLim = getX(to.back());
+
+    for (uint16_t fromIdx : from) {
+        float fromX = getX(fromIdx);
+        if (leftLim < fromX && fromX < rightLim) {
+            if constexpr (DEV_REF_DEBUG) {
+                std::cout << " --- Syncing refinement." << std::endl;
+            }
+            to.push_back(fromIdx);
+        }
+    }
+
+    // Now re-sort by x-coord and remove duplicates.
+    std::sort(to.begin(), to.end(), [getX](uint16_t a, uint16_t b) {
+        return getX(a) < getX(b); //
+    });
+    auto last = std::unique(to.begin(), to.end(), [getX](uint16_t a, uint16_t b) {
+        return getX(a) == getX(b); //
+    });
+    to.erase(last, to.end());
+}
+
+// Precondition: to and from are sorted by increasing z.
+void FunctionMesh::syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_t> &from) { // TODO: Update to vertical.
+    assert(!to.empty());
+
+    auto getZ = [this](size_t index) -> float {
+        return mFloorMeshVertices[index].pos.z; //
+    };
+
+    float leftLim  = getZ(to.front());
+    float rightLim = getZ(to.back());
+
+    for (uint16_t fromIdx : from) {
+        float fromX = getZ(fromIdx);
+        if (leftLim < fromX && fromX < rightLim) {
+            if constexpr (DEV_REF_DEBUG) {
+                std::cout << " --- Syncing refinement." << std::endl;
+            }
+            to.push_back(fromIdx);
+        }
+    }
+
+    // Now re-sort by x-coord and remove duplicates.
+    std::sort(to.begin(), to.end(), [getZ](uint16_t a, uint16_t b) {
+        return getZ(a) < getZ(b); //
+    });
+    auto last = std::unique(to.begin(), to.end(), [getZ](uint16_t a, uint16_t b) {
+        return getZ(a) == getZ(b); //
+    });
+    to.erase(last, to.end());
+}
+
+// Precondition: All edge refinments have been populated.
+void FunctionMesh::syncEdgeRefinements(Square &square) {
+    if (square.hasChildren()) {
+        for (auto &child : square.children) {
+            syncEdgeRefinements(child);
+        }
+        // This only needs done for leaf cells, which are rendered.
+        return;
+    }
+
+    auto northNbRefmnts = getNorthNbRefinements(&square);
+    if (northNbRefmnts != nullptr && northNbRefmnts->size() > 2) {
+        if constexpr (DEV_REF_DEBUG) {
+            std::cout << ">>> Before north refinement sync: " << std::endl;
+            debugRefinements(std::cout, square) << std::endl;
+        }
+        syncRefmtsHoriz(square.edgeRefinements.north, *northNbRefmnts);
+        if constexpr (DEV_REF_DEBUG) {
+            std::cout << ">>> After north refinement sync: " << std::endl;
+            debugRefinements(std::cout, square) << std::endl;
+        }
+    }
+    auto southNbRefmnts = getSouthNbRefinements(&square);
+    if (southNbRefmnts != nullptr && southNbRefmnts->size() > 2) {
+        if constexpr (DEV_REF_DEBUG) {
+            std::cout << "Doing a south neighbor refinement sync. # refinements: "
+                      << std::to_string(southNbRefmnts->size()) << std::endl;
+            uint32_t square_i = 0;
+            std::cout << debugSquareCell(square, square_i) << std::endl;
+            std::cout << debugSquareCell(*square.southNeighbor, square_i) << std::endl;
+        }
+        syncRefmtsHoriz(square.edgeRefinements.south, *southNbRefmnts);
+    }
+    auto eastNbRefmnts = getEastNbRefinements(&square);
+    if (eastNbRefmnts != nullptr && eastNbRefmnts->size() > 2) {
+        syncRefmtsVert(square.edgeRefinements.east, *eastNbRefmnts);
+    }
+    auto westNbRefmnts = getWestNbRefinements(&square);
+    if (westNbRefmnts != nullptr && westNbRefmnts->size() > 2) {
+        syncRefmtsVert(square.edgeRefinements.west, *westNbRefmnts);
+    }
 }
