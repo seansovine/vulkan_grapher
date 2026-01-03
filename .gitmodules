@@ -4,3 +4,6 @@
 [submodule "thirdparty/mathpresso"]
 	path = thirdparty/mathpresso
 	url = git@github.com:kobalicek/mathpresso.git
+[submodule "thirdparty/asmjit"]
+	path = thirdparty/asmjit
+	url = git@github.com:asmjit/asmjit.git
