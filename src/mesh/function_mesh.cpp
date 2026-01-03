@@ -2,10 +2,10 @@
 
 #include "mesh.h"
 
-#include <algorithm>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -509,7 +509,8 @@ void FunctionMesh::computeVerticesAndIndices() {
     }
 
     mMeshIndices.clear();
-    // NOTE: This will not be accurate if refinement happens.
+    // NOTE: This size will not be accurate if refinement happens, but it
+    //       is okay if this reallocates as nothing references its data.
     mMeshIndices.reserve(mFloorMeshSquares.size() * 12);
     // These must have the same size as # mesh vertices.
     mFunctionMeshTriangles.resize(mFloorMeshVertices.size());
@@ -527,8 +528,6 @@ void FunctionMesh::computeVerticesAndIndices() {
 
     setFuncVertTBNs();
 }
-
-static constexpr bool DEV_REF_DEBUG = false;
 
 static std::vector<uint16_t> *getNorthNbRefinements(Square *square) {
     while (square != nullptr) {
@@ -585,9 +584,6 @@ void FunctionMesh::syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16
     for (uint16_t fromIdx : from) {
         float fromX = getX(fromIdx);
         if (leftLim < fromX && fromX < rightLim) {
-            if constexpr (DEV_REF_DEBUG) {
-                std::cout << " --- Syncing refinement." << std::endl;
-            }
             to.push_back(fromIdx);
         }
     }
@@ -616,14 +612,11 @@ void FunctionMesh::syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_
     for (uint16_t fromIdx : from) {
         float fromX = getZ(fromIdx);
         if (leftLim < fromX && fromX < rightLim) {
-            if constexpr (DEV_REF_DEBUG) {
-                std::cout << " --- Syncing refinement." << std::endl;
-            }
             to.push_back(fromIdx);
         }
     }
 
-    // Now re-sort by x-coord and remove duplicates.
+    // Now re-sort by z-coord and remove duplicates.
     std::sort(to.begin(), to.end(), [getZ](uint16_t a, uint16_t b) {
         return getZ(a) < getZ(b); //
     });
@@ -645,31 +638,19 @@ void FunctionMesh::syncEdgeRefinements(Square &square) {
 
     auto northNbRefmnts = getNorthNbRefinements(&square);
     if (northNbRefmnts != nullptr && northNbRefmnts->size() > 2) {
-        if constexpr (DEV_REF_DEBUG) {
-            std::cout << ">>> Before north refinement sync: " << std::endl;
-            debugRefinements(std::cout, square) << std::endl;
-        }
         syncRefmtsHoriz(square.edgeRefinements.north, *northNbRefmnts);
-        if constexpr (DEV_REF_DEBUG) {
-            std::cout << ">>> After north refinement sync: " << std::endl;
-            debugRefinements(std::cout, square) << std::endl;
-        }
     }
+
     auto southNbRefmnts = getSouthNbRefinements(&square);
     if (southNbRefmnts != nullptr && southNbRefmnts->size() > 2) {
-        if constexpr (DEV_REF_DEBUG) {
-            std::cout << "Doing a south neighbor refinement sync. # refinements: "
-                      << std::to_string(southNbRefmnts->size()) << std::endl;
-            uint32_t square_i = 0;
-            std::cout << debugSquareCell(square, square_i) << std::endl;
-            std::cout << debugSquareCell(*square.southNeighbor, square_i) << std::endl;
-        }
         syncRefmtsHoriz(square.edgeRefinements.south, *southNbRefmnts);
     }
+
     auto eastNbRefmnts = getEastNbRefinements(&square);
     if (eastNbRefmnts != nullptr && eastNbRefmnts->size() > 2) {
         syncRefmtsVert(square.edgeRefinements.east, *eastNbRefmnts);
     }
+
     auto westNbRefmnts = getWestNbRefinements(&square);
     if (westNbRefmnts != nullptr && westNbRefmnts->size() > 2) {
         syncRefmtsVert(square.edgeRefinements.west, *westNbRefmnts);

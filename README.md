@@ -6,7 +6,7 @@ We have previously written a version of the function grapher using C++ + OpenGL 
 and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](https://github.com/seansovine/wgpu_grapher).
 
 <p align="center" margin="20px">
-	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_blue_2026-01-01.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_blue_2026-01-03.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
 _Graph of radial sinc function._
@@ -18,7 +18,7 @@ either its values or its derivatives -- are changing rapidly. To address this we
 mesh refinement to try to add enough detail in these parts of the function without doing unnecessary
 work in other areas of the graph. The mesh coloration in the image is a debugging feature to show where
 the mesh was refined. The green color indicates one level of refinement, and the orange color indicates
-a second, further level was done.
+where a second, further level was done.
 
 <p align="center" margin="20px">
 	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/mesh_refinement_2_2026-01-01.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
@@ -33,7 +33,7 @@ to the UI for user selection.
 ## PBR material shading
 
 <p align="center" margin="20px">
-	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_purple_metallic_2025-12-30.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/graph_pbr_example_2026-01-03.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
 There is now the option to render the graph surface as a solid with basic PBR material shading.

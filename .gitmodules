@@ -1,3 +1,6 @@
 [submodule "thirdparty/imgui"]
 	path = thirdparty/imgui
 	url = git@github.com:ocornut/imgui.git
+[submodule "thirdparty/mathpresso"]
+	path = thirdparty/mathpresso
+	url = git@github.com:kobalicek/mathpresso.git
