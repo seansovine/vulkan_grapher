@@ -72,6 +72,7 @@ struct Triangle {
 
     // Normal vector in world coordinates.
     glm::vec3 normal;
+    double area;
 };
 
 // --------------------
@@ -349,6 +350,7 @@ private:
     std::vector<Triangle> mFunctionMeshTriangles = {};
     // Indices of triangles this vertex is incident to; for normal calculations.
     std::vector<std::set<uint16_t>> mVertexTriangles = {};
+    // TODO: Switch to 32-bit indices to allow finer meshes.
 
     // For now we assume a simple relationship between floor and function meshes.
     std::vector<uint16_t> mMeshIndices = {};

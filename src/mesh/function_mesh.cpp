@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Square implementations.
@@ -404,27 +406,61 @@ void FunctionMesh::addTriIndices(const Triangle &tri) {
     mMeshIndices.push_back(tri.vert3Idx);
 }
 
+// Thanks to Henrique Bucher, who presented this numerically stable version of
+// Heron's formula derived by William Kahan on the Low Latency Insights substack.
+double triangleArea(double len1, double len2, double len3) {
+    // Sort lengths.
+    if (len2 > len1) {
+        std::swap(len2, len1);
+    }
+    if (len3 > len2) {
+        std::swap(len3, len2);
+    }
+    if (len2 > len1) {
+        std::swap(len2, len1);
+    }
+
+    // Degenerate case.
+    if (len1 >= len2 + len3) {
+        return 0.0;
+    }
+
+    // Heron's formula with ordered operations.
+    return 0.25 * std::sqrt(                   //
+                      (len1 + (len2 + len3)) * //
+                      (len3 - (len1 - len2)) * //
+                      (len3 + (len1 - len2)) * //
+                      (len1 + (len2 - len3))   //
+                  );
+}
+
 void FunctionMesh::setFuncVertTBNs() {
-    // Assign normal to each triangle.
+    // Assign normal and area to each triangle.
     for (Triangle &tri : mFunctionMeshTriangles) {
         glm::vec3 &vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
         glm::vec3 &vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
         glm::vec3 &vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
         // TODO: Make sure we have the correct orientation.
         tri.normal = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
+
+        double len1 = glm::length(vert1 - vert2);
+        double len2 = glm::length(vert2 - vert3);
+        double len3 = glm::length(vert3 - vert1);
+        tri.area    = triangleArea(len1, len2, len3);
     }
 
     constexpr glm::vec3 xDir = {1.0f, 0.0f, 0.0f};
     constexpr glm::vec3 zDir = {0.0f, 0.0f, 1.0f};
 
     // Now compute TBN basis for each vertex by averaging tri normals.
+    // TODO: Look into computing in double precision here.
     for (uint16_t i = 0; i < mFloorMeshVertices.size(); i++) {
         Vertex &funcVert = mFunctionMeshVertices[i];
 
         glm::vec3 avgNormal = {0.0f, 0.0f, 0.0f};
         for (uint16_t vertTriIdx : mVertexTriangles[i]) {
             const Triangle &vertTri = mFunctionMeshTriangles[vertTriIdx];
-            avgNormal += vertTri.normal * (1.0f / mVertexTriangles[i].size());
+            avgNormal += static_cast<float>(vertTri.area) * vertTri.normal;
         }
         avgNormal       = glm::normalize(avgNormal);
         funcVert.normal = avgNormal;
