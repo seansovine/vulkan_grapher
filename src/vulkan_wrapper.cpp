@@ -1135,7 +1135,7 @@ void GlfwVulkanWrapper::createVertexBuffer(const std::vector<Vertex> &vertexData
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint16_t> &indices, VkBuffer &indexBuffer,
+void GlfwVulkanWrapper::createIndexBuffer(const std::vector<uint32_t> &indices, VkBuffer &indexBuffer,
                                           VkDeviceMemory &indexBufferMemory) {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
@@ -1289,7 +1289,7 @@ void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandB
             VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
             VkDeviceSize offsets[]   = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
                                     &mesh.descriptorSets[currentFrame], 0, nullptr);

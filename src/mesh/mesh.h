@@ -69,7 +69,7 @@ struct Vertex {
 
 struct IndexedMesh {
     std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
+    std::vector<uint32_t> indices;
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -161,7 +161,7 @@ static const std::vector<Vertex> TEST_VERTICES_2 = {
 };
 // clang-format on
 
-static const std::vector<uint16_t> TEST_INDICES = {
+static const std::vector<uint32_t> TEST_INDICES = {
     0, 1, 2 //
 };
 

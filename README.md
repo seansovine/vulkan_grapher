@@ -6,7 +6,7 @@ We have previously written a version of the function grapher using C++ + OpenGL 
 and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](https://github.com/seansovine/wgpu_grapher).
 
 <p align="center" margin="20px">
-	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_blue_2026-01-03.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_blue.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
 _Graph of radial sinc function._
@@ -33,28 +33,23 @@ to the UI for user selection.
 ## PBR material shading
 
 <p align="center" margin="20px">
-	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/graph_pbr_example_2026-01-03.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/graph_pbr_example_2.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
-There is now the option to render the graph surface as a solid with basic PBR material shading.
-The current version of this closely follows the examples from the excellent site
-[learnopengl.com](https://learnopengl.com/).
-
-The GUI now also features sliders to adjust the surface color and its PBR metallic and roughness
-properties. The lighting effects in this shading reveal some of the shortcomings of our
-current meshing approach, which we'll work on improving. However, moving the PBR computations
-to the fragment shader has also drastically improved this, by reducing the effects of fragment
-interpolation.
+The surface can be rendered as a wireframe or as a solid with PBR shading using the popular metallic
+material model. The PBR shading implementation closely follows the examples from the excellent site
+[learnopengl.com](https://learnopengl.com/). The GUI has sliders to adjust the surface color
+and PBR metallic and roughness properties.
 
 ## To do next
 
 Next we will add these graphing features:
 
-1. Either find or write a mathematical expression parsing library in C/C++.
+1. Integrate a mathematical expression parsing library.
 
 2. Add better user interaction features like mouse control of the view.
 
-3. Add user control of graphing and render parameters.
+3. Add more user control of graphing and render parameters.
 
 4. Keep looking at ways to improve the mesh quality for round surfaces.
 

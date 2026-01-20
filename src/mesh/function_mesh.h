@@ -8,8 +8,10 @@
 
 #include <cassert>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <set>
+#include <string>
 #include <vector>
 
 // ------------------
@@ -32,33 +34,30 @@ struct Square {
     // Parent square, if this is a refinement.
     Square *parent = nullptr;
 
-    // TODO: We need to add additional edge vertices/
-    // triangles when neighbor squares get refined.
-
     // Vertex indeices of corners.
-    // UINT16_MAX means unassigned.
-    uint16_t topLeftIdx     = UINT16_MAX;
-    uint16_t topRightIdx    = UINT16_MAX;
-    uint16_t bottomRightIdx = UINT16_MAX;
-    uint16_t bottomLeftIdx  = UINT16_MAX;
-    uint16_t centerIdx      = UINT16_MAX;
+    // UINT32_MAX means unassigned.
+    uint32_t topLeftIdx     = UINT32_MAX;
+    uint32_t topRightIdx    = UINT32_MAX;
+    uint32_t bottomRightIdx = UINT32_MAX;
+    uint32_t bottomLeftIdx  = UINT32_MAX;
+    uint32_t centerIdx      = UINT32_MAX;
 
     // Child squares if this has been refined.
     // Order is: top-left, top-right, bottom-left, bottom-right.
     std::vector<Square> children;
 
     // Indices of triangles for this square.
-    std::vector<uint16_t> triangleIndices;
+    std::vector<uint32_t> triangleIndices;
 
     bool hasChildren() const {
         return !children.empty();
     }
 
     struct EdgeRefinements {
-        std::vector<uint16_t> north;
-        std::vector<uint16_t> west;
-        std::vector<uint16_t> south;
-        std::vector<uint16_t> east;
+        std::vector<uint32_t> north;
+        std::vector<uint32_t> west;
+        std::vector<uint32_t> south;
+        std::vector<uint32_t> east;
     };
     EdgeRefinements edgeRefinements;
 
@@ -66,9 +65,9 @@ struct Square {
 };
 
 struct Triangle {
-    uint16_t vert1Idx = UINT16_MAX;
-    uint16_t vert2Idx = UINT16_MAX;
-    uint16_t vert3Idx = UINT16_MAX;
+    uint32_t vert1Idx = UINT32_MAX;
+    uint32_t vert2Idx = UINT32_MAX;
+    uint32_t vert3Idx = UINT32_MAX;
 
     // Normal vector in world coordinates.
     glm::vec3 normal;
@@ -131,13 +130,13 @@ public:
         return mFunctionMeshVertices;
     }
 
-    std::vector<uint16_t> &meshIndices() {
+    std::vector<uint32_t> &meshIndices() {
         return mMeshIndices;
     }
 
     // Mesh debugging methods.
 
-    std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint16_t vertex_i) {
+    std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint32_t vertex_i) {
         const Vertex &vertex = mFloorMeshVertices[vertex_i];
         debugStrm << "(" << vertex.pos.x << ", " << vertex.pos.z << ")";
         return debugStrm;
@@ -146,25 +145,25 @@ public:
     std::basic_ostream<char> &debugRefinements(std::basic_ostream<char> &debugStrm, const Square &square) {
         std::string indent(square.depth * 4, ' ');
         debugStrm << indent << " = North refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.north) {
+        for (uint32_t refinmnt : square.edgeRefinements.north) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = West refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.west) {
+        for (uint32_t refinmnt : square.edgeRefinements.west) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = South refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.south) {
+        for (uint32_t refinmnt : square.edgeRefinements.south) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
         debugStrm << std::endl;
         debugStrm << indent << " = East refinements:";
-        for (uint16_t refinmnt : square.edgeRefinements.east) {
+        for (uint32_t refinmnt : square.edgeRefinements.east) {
             debugStrm << " ";
             debugVertex(debugStrm, refinmnt);
         }
@@ -172,7 +171,7 @@ public:
         return debugStrm;
     }
 
-    std::string debugSquareCell(const Square &square, uint32_t &square_i) {
+    std::string debugSquareCell(const Square &square, uint32_t &square_i, bool recurse = true) {
         std::stringstream debugStrm;
         std::string indent(square.depth * 4, ' ');
 
@@ -189,7 +188,7 @@ public:
         debugStrm << indent << " - center: ";
         debugVertex(debugStrm, square.centerIdx) << std::endl;
 
-        if (square.hasChildren()) {
+        if (recurse && square.hasChildren()) {
             debugStrm << indent << " + Children:" << std::endl;
             for (const Square &child : square.children) {
                 debugStrm << debugSquareCell(child, square_i);
@@ -210,14 +209,49 @@ public:
         return debugStrm.str();
     }
 
+    void debugTriangle(const Triangle &tri) {
+        std::cout << "Tri indices: " << std::endl; //
+        std::cout << "   " << std::setw(6) << std::to_string(tri.vert1Idx) << " ";
+        debugVertex(std::cout, tri.vert1Idx) << std::endl;
+        std::cout << "   " << std::setw(6) << std::to_string(tri.vert2Idx) << " ";
+        debugVertex(std::cout, tri.vert2Idx) << std::endl;
+        std::cout << "   " << std::setw(6) << std::to_string(tri.vert3Idx) << " ";
+        debugVertex(std::cout, tri.vert3Idx) << std::endl;
+    }
+
+    void logIndices(const Square &square) {
+        auto logRefinements = [](const std::vector<uint32_t> &refinements) {
+            for (uint32_t i = 0; i < refinements.size() - 1; i++) {
+                std::cout << std::to_string(refinements[i]) << ", ";
+            }
+            std::cout << std::to_string(refinements.back()) << std::endl;
+        };
+
+        std::cout << "Square indices:" << std::endl;
+        std::cout << " --- Center:  " << std::to_string(square.centerIdx) << std::endl;
+        std::cout << " - Top left:  " << std::to_string(square.topLeftIdx) << std::endl;
+        std::cout << " - Top right: " << std::to_string(square.topRightIdx) << std::endl;
+        std::cout << " - Btm left:  " << std::to_string(square.bottomLeftIdx) << std::endl;
+        std::cout << " - Btm right: " << std::to_string(square.bottomRightIdx) << std::endl;
+
+        std::cout << " >> north refinements: ";
+        logRefinements(square.edgeRefinements.north);
+        std::cout << " >> west refinements:  ";
+        logRefinements(square.edgeRefinements.west);
+        std::cout << " >> south refinements: ";
+        logRefinements(square.edgeRefinements.south);
+        std::cout << " >> east refinements:  ";
+        logRefinements(square.edgeRefinements.east);
+    }
+
 private:
     void computeVerticesAndIndices();
 
     void syncEdgeRefinements(Square &square);
 
-    void syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16_t> &from);
+    void syncRefmtsHoriz(std::vector<uint32_t> &to, std::vector<uint32_t> &from);
 
-    void syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_t> &from);
+    void syncRefmtsVert(std::vector<uint32_t> &to, std::vector<uint32_t> &from);
 
     void buildFloorMesh();
 
@@ -225,7 +259,7 @@ private:
 
     void setFuncVertTBNs();
 
-    double funcMeshY(uint16_t index) {
+    double funcMeshY(uint32_t index) {
         return mFunctionMeshVertices[index].pos.y;
     }
 
@@ -252,7 +286,7 @@ private:
         float z;
     };
 
-    XZCoord meshXZ(uint16_t index) {
+    XZCoord meshXZ(uint32_t index) {
         return {mFloorMeshVertices[index].pos.x, mFloorMeshVertices[index].pos.z};
     }
 
@@ -307,7 +341,7 @@ private:
         assert(mFloorMeshVertices.size() == mFunctionMeshVertices.size());
         mMeshIndices.reserve(mFloorMeshVertices.size());
 
-        for (uint16_t i = 0; i < mFunctionMeshVertices.size(); i++) {
+        for (uint32_t i = 0; i < mFunctionMeshVertices.size(); i++) {
             mMeshIndices.push_back(i);
         }
     }
@@ -323,12 +357,12 @@ private:
     static constexpr glm::vec3 REFINE_DEBUG_COLOR2 = {1.0f, 0.5f, 0.0f};
 
     // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int mNumCells = 60;
+    static constexpr int mNumCells = 200;
 
     // Ensure we don't overlow our index type: This check is
     // necessary, but not sufficient, because of mesh refinement.
     static_assert(static_cast<uint64_t>(mNumCells) * static_cast<uint64_t>(mNumCells) <
-                  static_cast<uint64_t>(UINT16_MAX));
+                  static_cast<uint64_t>(UINT32_MAX));
 
     // = 1.0 / mNumCells.
     static constexpr double mCellWidth = 1.0 / mNumCells;
@@ -349,11 +383,12 @@ private:
     // Triangles in the function mesh; also used for floor mesh.
     std::vector<Triangle> mFunctionMeshTriangles = {};
     // Indices of triangles this vertex is incident to; for normal calculations.
-    std::vector<std::set<uint16_t>> mVertexTriangles = {};
-    // TODO: Switch to 32-bit indices to allow finer meshes.
+    //  -- This is parallel to mFunctionMeshVertices.
+    //  -- It contains indexes into mFunctionMeshTriangles.
+    std::vector<std::set<uint32_t>> mVertexTriangles = {};
 
     // For now we assume a simple relationship between floor and function meshes.
-    std::vector<uint16_t> mMeshIndices = {};
+    std::vector<uint32_t> mMeshIndices = {};
 };
 
 #endif // FUNCTION_MESH_H_

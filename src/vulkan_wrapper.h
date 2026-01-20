@@ -182,7 +182,7 @@ private:
     // Mesh buffer creation helpers.
     void createVertexBuffer(const std::vector<Vertex> &vertexData, VkBuffer &vertexBuffer,
                             VkDeviceMemory &vertexBufferMemory);
-    void createIndexBuffer(const std::vector<uint16_t> &indices, VkBuffer &indexBuffer,
+    void createIndexBuffer(const std::vector<uint32_t> &indices, VkBuffer &indexBuffer,
                            VkDeviceMemory &indexBufferMemory);
     void createUniformBuffers(UniformInfo &uniformInfo);
 

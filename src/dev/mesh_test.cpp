@@ -22,7 +22,7 @@ int main() {
     std::cout << "Testing function mesh generation." << std::endl;
 
     FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
-    std::cout << "Squares in tessellation: " << std::to_string(mesh.tessellationSquare().size()) << std::endl;
+    std::cout << "Squares in top-level tessellation: " << std::to_string(mesh.tessellationSquare().size()) << std::endl;
 
     float maxY = std::numeric_limits<float>::lowest();
     float minY = std::numeric_limits<float>::max();
@@ -34,5 +34,5 @@ int main() {
     std::cout << "Function mesh max y: " << std::to_string(maxY) << std::endl;
     std::cout << "Function mesh min y: " << std::to_string(minY) << std::endl;
 
-    std::cout << mesh.debugMesh() << std::endl;
+    // std::cout << mesh.debugMesh() << std::endl;
 }

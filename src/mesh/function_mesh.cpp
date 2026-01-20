@@ -225,7 +225,7 @@ void FunctionMesh::refine(Square &square) {
     float leftMiddle[2]  = {square.mTopLeft[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
     float rightMiddle[2] = {square.mBtmRight[0], 0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
 
-    auto addVert = [this, funcColor](float coords[2]) -> uint16_t {
+    auto addVert = [this, funcColor](float coords[2]) -> uint32_t {
         addFloorMeshVertex(coords[0], coords[1]);
         mFunctionMeshVertices.push_back(Vertex{
             .pos   = {coords[0], mFunc(coords[0], coords[1]), coords[1]},
@@ -234,10 +234,10 @@ void FunctionMesh::refine(Square &square) {
         return mFloorMeshVertices.size() - 1;
     };
 
-    uint16_t topMidIdx   = addVert(topMiddle);
-    uint16_t rightMidIdx = addVert(rightMiddle);
-    uint16_t btmMidIdx   = addVert(btmMiddle);
-    uint16_t leftMidIdx  = addVert(leftMiddle);
+    uint32_t topMidIdx   = addVert(topMiddle);
+    uint32_t rightMidIdx = addVert(rightMiddle);
+    uint32_t btmMidIdx   = addVert(btmMiddle);
+    uint32_t leftMidIdx  = addVert(leftMiddle);
 
     auto makeCenter = [](float topLeft[2], float btmRight[2]) -> XZCoord {
         return {0.5f * (topLeft[0] + btmRight[0]), 0.5f * (topLeft[1] + btmRight[1])};
@@ -252,7 +252,7 @@ void FunctionMesh::refine(Square &square) {
 
     XZCoord newCenter        = makeCenter(square.mTopLeft, center);
     float newCenterCoords[3] = {newCenter.x, newCenter.z};
-    uint16_t newCenterIdx    = addVert(newCenterCoords);
+    uint32_t newCenterIdx    = addVert(newCenterCoords);
 
     square.children.push_back(Square{
         .mTopLeft  = {square.mTopLeft[0], square.mTopLeft[1]},
@@ -274,7 +274,7 @@ void FunctionMesh::refine(Square &square) {
 
     XZCoord newCenter2        = makeCenter(topMiddle, rightMiddle);
     float newCenterCoords2[3] = {newCenter2.x, newCenter.z};
-    uint16_t newCenterIdx2    = addVert(newCenterCoords2);
+    uint32_t newCenterIdx2    = addVert(newCenterCoords2);
 
     square.children.push_back(Square{
         .mTopLeft  = {topMiddle[0], topMiddle[1]},
@@ -298,7 +298,7 @@ void FunctionMesh::refine(Square &square) {
 
     XZCoord newCenter3        = makeCenter(leftMiddle, btmMiddle);
     float newCenterCoords3[3] = {newCenter3.x, newCenter3.z};
-    uint16_t newCenterIdx3    = addVert(newCenterCoords3);
+    uint32_t newCenterIdx3    = addVert(newCenterCoords3);
 
     square.children.push_back(Square{
         .mTopLeft  = {leftMiddle[0], leftMiddle[1]},
@@ -322,7 +322,7 @@ void FunctionMesh::refine(Square &square) {
 
     XZCoord newCenter4        = makeCenter(center, square.mBtmRight);
     float newCenterCoords4[3] = {newCenter4.x, newCenter4.z};
-    uint16_t newCenterIdx4    = addVert(newCenterCoords4);
+    uint32_t newCenterIdx4    = addVert(newCenterCoords4);
 
     square.children.push_back(Square{
         .mTopLeft  = {center[0], center[1]},
@@ -352,6 +352,8 @@ void FunctionMesh::refine(Square &square) {
     }
 }
 
+constexpr bool DEV_DEBUG = false;
+
 void FunctionMesh::addSquareTris(const Square &square) {
     // If square has children, instead recurse into them.
     if (square.hasChildren()) {
@@ -360,20 +362,23 @@ void FunctionMesh::addSquareTris(const Square &square) {
         }
         return;
     }
+    if constexpr (DEV_DEBUG) {
+        logIndices(square);
+        uint32_t square_i = 0;
+        std::cout << debugSquareCell(square, square_i, false);
+    }
 
-    auto addTri = [this](uint16_t idx1, uint16_t idx2, uint16_t idx3) {
+    auto addTri = [this](uint32_t idx1, uint32_t idx2, uint32_t idx3) {
         Triangle newTri = {.vert1Idx = idx1, .vert2Idx = idx2, .vert3Idx = idx3};
         mFunctionMeshTriangles.push_back(newTri);
         size_t newTriIdx = mFunctionMeshTriangles.size() - 1;
         mVertexTriangles[idx1].insert(newTriIdx);
         mVertexTriangles[idx2].insert(newTriIdx);
         mVertexTriangles[idx3].insert(newTriIdx);
+        if constexpr (DEV_DEBUG) {
+            debugTriangle(mFunctionMeshTriangles.back());
+        }
     };
-
-    // NOTE: This handles squares that don't have children. Effectively
-    //       we currently only support refining meshes to a single level.
-    //       We'll have to think of something more sophisticated to allow
-    //       further levels of refinement.
 
     // Top triangles.
     const auto &northRefinements = square.edgeRefinements.north;
@@ -440,8 +445,7 @@ void FunctionMesh::setFuncVertTBNs() {
         glm::vec3 &vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
         glm::vec3 &vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
         glm::vec3 &vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
-        // TODO: Make sure we have the correct orientation.
-        tri.normal = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
+        tri.normal       = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
 
         double len1 = glm::length(vert1 - vert2);
         double len2 = glm::length(vert2 - vert3);
@@ -454,11 +458,11 @@ void FunctionMesh::setFuncVertTBNs() {
 
     // Now compute TBN basis for each vertex by averaging tri normals.
     // TODO: Look into computing in double precision here.
-    for (uint16_t i = 0; i < mFloorMeshVertices.size(); i++) {
+    for (uint32_t i = 0; i < mFloorMeshVertices.size(); i++) {
         Vertex &funcVert = mFunctionMeshVertices[i];
 
         glm::vec3 avgNormal = {0.0f, 0.0f, 0.0f};
-        for (uint16_t vertTriIdx : mVertexTriangles[i]) {
+        for (uint32_t vertTriIdx : mVertexTriangles[i]) {
             const Triangle &vertTri = mFunctionMeshTriangles[vertTriIdx];
             avgNormal += static_cast<float>(vertTri.area) * vertTri.normal;
         }
@@ -502,19 +506,19 @@ void FunctionMesh::computeVerticesAndIndices() {
         }
 
         // Add remaining unassigned vertices and indices.
-        if (square.topLeftIdx == UINT16_MAX) {
+        if (square.topLeftIdx == UINT32_MAX) {
             addFloorMeshVertex(square.mTopLeft[0], square.mTopLeft[1]);
             square.topLeftIdx = mFloorMeshVertices.size() - 1;
         }
-        if (square.topRightIdx == UINT16_MAX) {
+        if (square.topRightIdx == UINT32_MAX) {
             addFloorMeshVertex(square.mBtmRight[0], square.mTopLeft[1]);
             square.topRightIdx = mFloorMeshVertices.size() - 1;
         }
-        if (square.bottomRightIdx == UINT16_MAX) {
+        if (square.bottomRightIdx == UINT32_MAX) {
             addFloorMeshVertex(square.mBtmRight[0], square.mBtmRight[1]);
             square.bottomRightIdx = mFloorMeshVertices.size() - 1;
         }
-        if (square.bottomLeftIdx == UINT16_MAX) {
+        if (square.bottomLeftIdx == UINT32_MAX) {
             addFloorMeshVertex(square.mTopLeft[0], square.mBtmRight[1]);
             square.bottomLeftIdx = mFloorMeshVertices.size() - 1;
         }
@@ -548,9 +552,8 @@ void FunctionMesh::computeVerticesAndIndices() {
     // NOTE: This size will not be accurate if refinement happens, but it
     //       is okay if this reallocates as nothing references its data.
     mMeshIndices.reserve(mFloorMeshSquares.size() * 12);
-    // These must have the same size as # mesh vertices.
-    mFunctionMeshTriangles.resize(mFloorMeshVertices.size());
-    mVertexTriangles.resize(mFloorMeshVertices.size());
+    mFunctionMeshTriangles.clear();
+    mVertexTriangles.resize(mFunctionMeshVertices.size());
 
     // Create triangles for squares.
     for (auto &square : mFloorMeshSquares) {
@@ -565,7 +568,7 @@ void FunctionMesh::computeVerticesAndIndices() {
     setFuncVertTBNs();
 }
 
-static std::vector<uint16_t> *getNorthNbRefinements(Square *square) {
+static std::vector<uint32_t> *getNorthNbRefinements(Square *square) {
     while (square != nullptr) {
         if (square->northNeighbor != nullptr) {
             return &square->northNeighbor->edgeRefinements.south;
@@ -575,7 +578,7 @@ static std::vector<uint16_t> *getNorthNbRefinements(Square *square) {
     }
     return nullptr;
 }
-static std::vector<uint16_t> *getSouthNbRefinements(Square *square) {
+static std::vector<uint32_t> *getSouthNbRefinements(Square *square) {
     while (square != nullptr) {
         if (square->southNeighbor != nullptr) {
             return &square->southNeighbor->edgeRefinements.north;
@@ -585,7 +588,7 @@ static std::vector<uint16_t> *getSouthNbRefinements(Square *square) {
     }
     return nullptr;
 }
-static std::vector<uint16_t> *getEastNbRefinements(Square *square) {
+static std::vector<uint32_t> *getEastNbRefinements(Square *square) {
     while (square != nullptr) {
         if (square->eastNeighbor != nullptr) {
             return &square->eastNeighbor->edgeRefinements.west;
@@ -595,7 +598,7 @@ static std::vector<uint16_t> *getEastNbRefinements(Square *square) {
     }
     return nullptr;
 }
-static std::vector<uint16_t> *getWestNbRefinements(Square *square) {
+static std::vector<uint32_t> *getWestNbRefinements(Square *square) {
     while (square != nullptr) {
         if (square->westNeighbor != nullptr) {
             return &square->westNeighbor->edgeRefinements.east;
@@ -607,7 +610,7 @@ static std::vector<uint16_t> *getWestNbRefinements(Square *square) {
 }
 
 // Precondition: to and from are sorted left-to-right.
-void FunctionMesh::syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16_t> &from) {
+void FunctionMesh::syncRefmtsHoriz(std::vector<uint32_t> &to, std::vector<uint32_t> &from) {
     assert(!to.empty());
 
     auto getX = [this](size_t index) -> float {
@@ -617,7 +620,7 @@ void FunctionMesh::syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16
     float leftLim  = getX(to.front());
     float rightLim = getX(to.back());
 
-    for (uint16_t fromIdx : from) {
+    for (uint32_t fromIdx : from) {
         float fromX = getX(fromIdx);
         if (leftLim < fromX && fromX < rightLim) {
             to.push_back(fromIdx);
@@ -625,17 +628,17 @@ void FunctionMesh::syncRefmtsHoriz(std::vector<uint16_t> &to, std::vector<uint16
     }
 
     // Now re-sort by x-coord and remove duplicates.
-    std::sort(to.begin(), to.end(), [getX](uint16_t a, uint16_t b) {
+    std::sort(to.begin(), to.end(), [getX](uint32_t a, uint32_t b) {
         return getX(a) < getX(b); //
     });
-    auto last = std::unique(to.begin(), to.end(), [getX](uint16_t a, uint16_t b) {
+    auto last = std::unique(to.begin(), to.end(), [getX](uint32_t a, uint32_t b) {
         return getX(a) == getX(b); //
     });
     to.erase(last, to.end());
 }
 
 // Precondition: to and from are sorted by increasing z.
-void FunctionMesh::syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_t> &from) { // TODO: Update to vertical.
+void FunctionMesh::syncRefmtsVert(std::vector<uint32_t> &to, std::vector<uint32_t> &from) { // TODO: Update to vertical.
     assert(!to.empty());
 
     auto getZ = [this](size_t index) -> float {
@@ -645,7 +648,7 @@ void FunctionMesh::syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_
     float leftLim  = getZ(to.front());
     float rightLim = getZ(to.back());
 
-    for (uint16_t fromIdx : from) {
+    for (uint32_t fromIdx : from) {
         float fromX = getZ(fromIdx);
         if (leftLim < fromX && fromX < rightLim) {
             to.push_back(fromIdx);
@@ -653,10 +656,10 @@ void FunctionMesh::syncRefmtsVert(std::vector<uint16_t> &to, std::vector<uint16_
     }
 
     // Now re-sort by z-coord and remove duplicates.
-    std::sort(to.begin(), to.end(), [getZ](uint16_t a, uint16_t b) {
+    std::sort(to.begin(), to.end(), [getZ](uint32_t a, uint32_t b) {
         return getZ(a) < getZ(b); //
     });
-    auto last = std::unique(to.begin(), to.end(), [getZ](uint16_t a, uint16_t b) {
+    auto last = std::unique(to.begin(), to.end(), [getZ](uint32_t a, uint32_t b) {
         return getZ(a) == getZ(b); //
     });
     to.erase(last, to.end());
