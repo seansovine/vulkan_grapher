@@ -5,6 +5,7 @@
 #include "uniforms.h"
 #include "vulkan_objects.h"
 
+#include <cassert>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
@@ -16,6 +17,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <vector>
 
 struct Vertex {
@@ -67,6 +69,45 @@ struct Vertex {
     }
 };
 
+struct MeshDescriptorSetLayout {
+    MeshDescriptorSetLayout() = default;
+
+    void init(VkDevice inDevice) {
+        device = inDevice;
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding            = 0;
+        uboLayoutBinding.descriptorCount    = 1;
+        uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings    = &uboLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
+
+    ~MeshDescriptorSetLayout() {
+        if (layout != nullptr) {
+            std::cerr << "MeshDescriptorSetLayout must be explicitly destroyed." << std::endl;
+        }
+        assert(descriptorSetLayout == nullptr);
+    }
+
+    void destroy() {
+        assert(device != nullptr);
+        vkDestroyDescriptorSetLayout(device, layout, nullptr);
+        layout = nullptr;
+    }
+
+    VkDevice device              = nullptr;
+    VkDescriptorSetLayout layout = nullptr;
+};
+
 struct IndexedMesh {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -80,8 +121,60 @@ struct IndexedMesh {
     UniformInfo uniformInfo;
 
     VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorSetLayout;
+    MeshDescriptorSetLayout descriptorSetLayout;
     std::vector<VkDescriptorSet> descriptorSets;
+
+    void createDescriptorSetLayout(VkDevice device) {
+        descriptorSetLayout.init(device);
+    }
+
+    void createDescriptorPool(VkDevice device, uint32_t numDescriptorSets) {
+        VkDescriptorPoolSize poolSize = {};
+        poolSize.type                 = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount      = numDescriptorSets;
+
+        VkDescriptorPoolCreateInfo createInfo = {};
+        createInfo.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        createInfo.maxSets                    = numDescriptorSets;
+        createInfo.poolSizeCount              = 1;
+        createInfo.pPoolSizes                 = &poolSize;
+
+        if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("Unable to create descriptor pool!");
+        }
+    }
+
+    void createDescriptorSets(VkDevice device, uint32_t numDescriptorSets) {
+        std::vector<VkDescriptorSetLayout> layouts(numDescriptorSets, descriptorSetLayout.layout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool     = descriptorPool;
+        allocInfo.descriptorSetCount = numDescriptorSets;
+        allocInfo.pSetLayouts        = layouts.data();
+
+        descriptorSets.resize(numDescriptorSets);
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < numDescriptorSets; i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = uniformInfo.uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range  = sizeof(TransformsUniform);
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet          = descriptorSets[i];
+            descriptorWrite.dstBinding      = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo     = &bufferInfo;
+
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+        }
+    }
 
     void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio) {
         static auto startTime = std::chrono::high_resolution_clock::now();
@@ -132,11 +225,10 @@ struct IndexedMesh {
 
     void destroyResources(VkDevice device) {
         uniformInfo.destroy(device);
-
         destroyBuffers(device);
 
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+        descriptorSetLayout.destroy();
     }
 };
 

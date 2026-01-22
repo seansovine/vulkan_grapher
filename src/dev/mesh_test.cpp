@@ -34,5 +34,5 @@ int main() {
     std::cout << "Function mesh max y: " << std::to_string(maxY) << std::endl;
     std::cout << "Function mesh min y: " << std::to_string(minY) << std::endl;
 
-    // std::cout << mesh.debugMesh() << std::endl;
+    std::cout << mesh.debugMesh() << std::endl;
 }

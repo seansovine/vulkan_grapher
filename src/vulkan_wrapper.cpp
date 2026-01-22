@@ -27,10 +27,6 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     windowWidth  = inWindowWidth;
     windowHeight = inWindowHeight;
 
-    currentMeshes = meshData;
-    // For now assume just floor and func meshes; can relax later.
-    assert(currentMeshes.size() == 2);
-
     createInstance();
     setupDebugMessenger();
     createSurface();
@@ -43,31 +39,42 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createSwapchain();
     createImageViews();
     createRenderPass();
-    for (auto &mesh : currentMeshes) {
-        createDescriptorSetLayout(mesh);
-    }
+    descriptorSetLayout.init(device);
     createGraphicsPipeline();
     createColorResources();
     createDepthResources();
     createFramebuffers();
 
     createCommandPool();
-    for (auto &mesh : currentMeshes) {
-        createVertexBuffer(mesh.vertices, mesh.vertexBuffer, mesh.vertexBufferMemory);
-        assert(mesh.vertexBuffer != VK_NULL_HANDLE);
-        createIndexBuffer(mesh.indices, mesh.indexBuffer, mesh.indexBufferMemory);
-        assert(mesh.indexBuffer != VK_NULL_HANDLE);
-
-        createUniformBuffers(mesh.uniformInfo);
-        createDescriptorPool(mesh);
-        createDescriptorSets(mesh);
-    }
     createCommandBuffers();
     createSyncObjects();
+
+    // We're working towards removing this assumption.
+    assert(currentMeshes.size() == 2);
+    currentMeshes = meshData;
+    for (auto &mesh : currentMeshes) {
+        initMesh(mesh);
+    }
+}
+
+void GlfwVulkanWrapper::initMesh(IndexedMesh &mesh) {
+    createVertexBuffer(mesh.vertices, mesh.vertexBuffer, mesh.vertexBufferMemory);
+    assert(mesh.vertexBuffer != VK_NULL_HANDLE);
+    createIndexBuffer(mesh.indices, mesh.indexBuffer, mesh.indexBufferMemory);
+    assert(mesh.indexBuffer != VK_NULL_HANDLE);
+
+    createUniformBuffers(mesh.uniformInfo);
+    mesh.createDescriptorSetLayout(device);
+    mesh.createDescriptorPool(device, MAX_FRAMES_IN_FLIGHT);
+    mesh.createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT);
 }
 
 void GlfwVulkanWrapper::updateMeshes(const std::vector<IndexedMesh> &newMeshData) {
     // For now assume exactly floor and func meshes.
+    //
+    // TODO: Work towards more flexibility here, maybe by storing and
+    //       handling each mesh type explicitly, but adding additional mesh
+    //       additional mesh types that can be handled differently as needed.
     assert(newMeshData.size() == 2 && currentMeshes.size() == 2);
 
     for (uint8_t i = 0; i < 2; i++) {
@@ -131,6 +138,7 @@ void GlfwVulkanWrapper::deinit() {
     for (auto &mesh : currentMeshes) {
         mesh.destroyResources(device);
     }
+    descriptorSetLayout.destroy();
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -824,24 +832,6 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwVulkanWrapper::createDescriptorSetLayout(IndexedMesh &mesh) {
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding            = 0;
-    uboLayoutBinding.descriptorCount    = 1;
-    uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings    = &uboLayoutBinding;
-
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &mesh.descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
-}
-
 void GlfwVulkanWrapper::createGraphicsPipeline() {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType                                = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -933,7 +923,7 @@ void GlfwVulkanWrapper::createGraphicsPipeline() {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType                      = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount             = 1;
-    pipelineLayoutInfo.pSetLayouts                = &currentMeshes[0].descriptorSetLayout;
+    pipelineLayoutInfo.pSetLayouts                = &descriptorSetLayout.layout;
 
     std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamicState{};
@@ -1172,54 +1162,6 @@ void GlfwVulkanWrapper::createUniformBuffers(UniformInfo &uniformInfo) {
 
         vkMapMemory(device, uniformInfo.uniformBuffersMemory[i], 0, bufferSize, 0,
                     &uniformInfo.uniformBuffersMapped[i]);
-    }
-}
-
-void GlfwVulkanWrapper::createDescriptorPool(IndexedMesh &mesh) {
-    VkDescriptorPoolSize poolSize = {};
-    poolSize.type                 = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount      = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-    VkDescriptorPoolCreateInfo createInfo = {};
-    createInfo.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    createInfo.maxSets                    = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    createInfo.poolSizeCount              = 1;
-    createInfo.pPoolSizes                 = &poolSize;
-
-    if (vkCreateDescriptorPool(device, &createInfo, nullptr, &mesh.descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("Unable to create descriptor pool!");
-    }
-}
-
-void GlfwVulkanWrapper::createDescriptorSets(IndexedMesh &mesh) {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, mesh.descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool     = mesh.descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts        = layouts.data();
-
-    mesh.descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(device, &allocInfo, mesh.descriptorSets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = currentMeshes[0].uniformInfo.uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range  = sizeof(TransformsUniform);
-
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet          = mesh.descriptorSets[i];
-        descriptorWrite.dstBinding      = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo     = &bufferInfo;
-
-        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
     }
 }
 

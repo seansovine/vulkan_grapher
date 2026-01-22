@@ -61,7 +61,7 @@ private:
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    // TODO: Make this a vector.
+    MeshDescriptorSetLayout descriptorSetLayout;
     std::vector<IndexedMesh> currentMeshes;
 
     uint32_t imageCount                 = 0;
@@ -92,6 +92,8 @@ public:
 public:
     // Initialization functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::vector<IndexedMesh> &&meshData);
+
+    void initMesh(IndexedMesh &mesh);
 
     void updateMeshes(const std::vector<IndexedMesh> &meshData);
 
@@ -185,10 +187,6 @@ private:
     void createIndexBuffer(const std::vector<uint32_t> &indices, VkBuffer &indexBuffer,
                            VkDeviceMemory &indexBufferMemory);
     void createUniformBuffers(UniformInfo &uniformInfo);
-
-    void createDescriptorSetLayout(IndexedMesh &mesh);
-    void createDescriptorPool(IndexedMesh &mesh);
-    void createDescriptorSets(IndexedMesh &mesh);
 
     void createCommandBuffers();
     void createSyncObjects();
