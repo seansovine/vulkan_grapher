@@ -5,7 +5,6 @@
 #include "uniforms.h"
 #include "vulkan_objects.h"
 
-#include <cassert>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
@@ -14,6 +13,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -95,7 +95,7 @@ struct MeshDescriptorSetLayout {
         if (layout != nullptr) {
             std::cerr << "MeshDescriptorSetLayout must be explicitly destroyed." << std::endl;
         }
-        assert(descriptorSetLayout == nullptr);
+        assert(layout == nullptr);
     }
 
     void destroy() {
@@ -176,7 +176,7 @@ struct IndexedMesh {
         }
     }
 
-    void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio) {
+    void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio, glm::vec3 color) {
         static auto startTime = std::chrono::high_resolution_clock::now();
         static float lastTime = 0.0f;
 
@@ -205,7 +205,7 @@ struct IndexedMesh {
         ubo.proj[1][1] *= -1;
 
         // Update mesh color.
-        ubo.meshColor = appState.graphColor;
+        ubo.meshColor = color;
         // Set viewer position; constant for now.
         ubo.viewerPos = VIEWER_POS;
 

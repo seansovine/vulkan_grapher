@@ -8,6 +8,7 @@
 #include "vulkan_util/app_state.h"
 #include "vulkan_wrapper.h"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 
@@ -15,7 +16,7 @@ class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 
     AppState appState;
-    std::vector<IndexedMesh> meshesToRender;
+    std::array<IndexedMesh, 2> meshesToRender;
 
 public:
     Application();

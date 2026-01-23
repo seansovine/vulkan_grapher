@@ -13,6 +13,7 @@
 #include "vulkan_debug.h"
 #include "vulkan_helper.h"
 
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -20,7 +21,7 @@
 // State management functions.
 
 void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             std::vector<IndexedMesh> &&meshData) {
+                             std::array<IndexedMesh, 2> &meshData) {
     assert(inWindow);
     window = inWindow;
 
@@ -40,7 +41,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createImageViews();
     createRenderPass();
     descriptorSetLayout.init(device);
-    createGraphicsPipeline();
+    createGraphicsPipelines();
     createColorResources();
     createDepthResources();
     createFramebuffers();
@@ -49,12 +50,7 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createCommandBuffers();
     createSyncObjects();
 
-    // We're working towards removing this assumption.
-    assert(currentMeshes.size() == 2);
-    currentMeshes = meshData;
-    for (auto &mesh : currentMeshes) {
-        initMesh(mesh);
-    }
+    updateGraphAndFloorMeshes(meshData);
 }
 
 void GlfwVulkanWrapper::initMesh(IndexedMesh &mesh) {
@@ -69,32 +65,35 @@ void GlfwVulkanWrapper::initMesh(IndexedMesh &mesh) {
     mesh.createDescriptorSets(device, MAX_FRAMES_IN_FLIGHT);
 }
 
-void GlfwVulkanWrapper::updateMeshes(const std::vector<IndexedMesh> &newMeshData) {
-    // For now assume exactly floor and func meshes.
-    //
-    // TODO: Work towards more flexibility here, maybe by storing and
-    //       handling each mesh type explicitly, but adding additional mesh
-    //       additional mesh types that can be handled differently as needed.
-    assert(newMeshData.size() == 2 && currentMeshes.size() == 2);
+void GlfwVulkanWrapper::updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMesh) {
+    // Destroys existing vertex and index buffers.
+    currentMesh.destroyBuffers(device);
 
-    for (uint8_t i = 0; i < 2; i++) {
-        const auto &newMesh = newMeshData[i];
-        auto &currentMesh   = currentMeshes[i];
+    currentMesh.vertices = std::move(newMesh.vertices);
+    currentMesh.indices  = std::move(newMesh.indices);
 
-        // Destroys existing vertex and index buffers.
-        currentMesh.destroyBuffers(device);
+    createVertexBuffer(currentMesh.vertices, currentMesh.vertexBuffer, currentMesh.vertexBufferMemory);
+    assert(currentMesh.vertexBuffer != VK_NULL_HANDLE);
+    createIndexBuffer(currentMesh.indices, currentMesh.indexBuffer, currentMesh.indexBufferMemory);
+    assert(currentMesh.indexBuffer != VK_NULL_HANDLE);
 
-        currentMesh.vertices = newMesh.vertices;
-        currentMesh.indices  = newMesh.indices;
+    // Note that the copy commands here use vkQueueWaitIdle to copy
+    // sequentially. This should be fine here, as generating the mesh
+    // should take longer than copying it to the device.
+}
 
-        createVertexBuffer(currentMesh.vertices, currentMesh.vertexBuffer, currentMesh.vertexBufferMemory);
-        assert(currentMesh.vertexBuffer != VK_NULL_HANDLE);
-        createIndexBuffer(currentMesh.indices, currentMesh.indexBuffer, currentMesh.indexBufferMemory);
-        assert(currentMesh.indexBuffer != VK_NULL_HANDLE);
-
-        // Note that the copy commands here use vkQueueWaitIdle to copy
-        // sequentially. This should be fine here, as generating the mesh
-        // should take longer than copying it to the device.
+void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData) {
+    if (graphMesh.has_value()) {
+        updateMesh(newMeshData[0], graphMesh.value());
+    } else {
+        graphMesh = std::move(newMeshData[0]);
+        initMesh(graphMesh.value());
+    }
+    if (floorMesh.has_value()) {
+        updateMesh(newMeshData[1], floorMesh.value());
+    } else {
+        floorMesh = std::move(newMeshData[1]);
+        initMesh(floorMesh.value());
     }
 }
 
@@ -135,8 +134,11 @@ void GlfwVulkanWrapper::deinit() {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
-    for (auto &mesh : currentMeshes) {
-        mesh.destroyResources(device);
+    if (graphMesh.has_value()) {
+        graphMesh->destroyResources(device);
+    }
+    if (floorMesh.has_value()) {
+        floorMesh->destroyResources(device);
     }
     descriptorSetLayout.destroy();
 
@@ -173,9 +175,12 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    for (auto &mesh : currentMeshes) {
-        mesh.updateUniformBuffer(currentFrame, appState,
-                                 swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height);
+    float aspectRatio = swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height;
+    if (graphMesh.has_value()) {
+        graphMesh->updateUniformBuffer(currentFrame, appState, aspectRatio, appState.graphColor);
+    }
+    if (floorMesh.has_value()) {
+        floorMesh->updateUniformBuffer(currentFrame, appState, aspectRatio, floorMesh->vertices[0].color);
     }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
@@ -832,7 +837,7 @@ void GlfwVulkanWrapper::createRenderPass() {
     }
 }
 
-void GlfwVulkanWrapper::createGraphicsPipeline() {
+void GlfwVulkanWrapper::createGraphicsPipelines() {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType                                = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -1204,6 +1209,17 @@ void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandB
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+    auto drawMesh = [commandBuffer, this](const IndexedMesh &mesh) {
+        VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
+        VkDeviceSize offsets[]   = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
+                                &mesh.descriptorSets[currentFrame], 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+    };
+
     {
         VkViewport viewport{};
         viewport.x        = 0.0f;
@@ -1219,24 +1235,22 @@ void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandB
         scissor.extent = swapChainInfo.swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        for (uint32_t i = 0; i < currentMeshes.size(); i++) {
-            if (i == static_cast<uint32_t>(MeshStage::DRAW_FLOOR)) {
-                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipeline);
-            } else if (i == static_cast<uint32_t>(MeshStage::DRAW_GRAPH) && !appState.wireframe) {
-                VkPipeline pipeline = appState.pbrFragPipeline ? pbr2Pipeline : pbrPipeline;
-                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        if (graphMesh.has_value()) {
+            VkPipeline pipeline;
+            if (appState.wireframe) {
+                pipeline = wireframePipeline;
+            } else if (appState.pbrFragPipeline) {
+                pipeline = pbr2Pipeline;
+            } else {
+                pipeline = pbrPipeline;
             }
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            drawMesh(graphMesh.value());
+        }
 
-            const auto &mesh         = currentMeshes[i];
-            VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
-            VkDeviceSize offsets[]   = {0};
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
-                                    &mesh.descriptorSets[currentFrame], 0, nullptr);
-
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+        if (floorMesh.has_value() && appState.drawFloor) {
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrPipeline);
+            drawMesh(floorMesh.value());
         }
     }
 

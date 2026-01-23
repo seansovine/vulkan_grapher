@@ -62,7 +62,8 @@ private:
     std::vector<VkCommandBuffer> commandBuffers;
 
     MeshDescriptorSetLayout descriptorSetLayout;
-    std::vector<IndexedMesh> currentMeshes;
+    std::optional<IndexedMesh> graphMesh;
+    std::optional<IndexedMesh> floorMesh;
 
     uint32_t imageCount                 = 0;
     uint32_t currentFrame               = 0;
@@ -91,11 +92,13 @@ public:
 
 public:
     // Initialization functions.
-    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::vector<IndexedMesh> &&meshData);
+    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::array<IndexedMesh, 2> &meshData);
 
     void initMesh(IndexedMesh &mesh);
 
-    void updateMeshes(const std::vector<IndexedMesh> &meshData);
+    // This moves out of meshData members and takes ownership of data.
+    void updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &meshData);
+    void updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMesh);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {
         uiDeinitCallback = inUiDeinitCallback;
@@ -174,7 +177,7 @@ private:
     void createSwapchain();
     void createImageViews();
     void createRenderPass();
-    void createGraphicsPipeline();
+    void createGraphicsPipelines();
 
     void createFramebuffers();
     void createCommandPool();

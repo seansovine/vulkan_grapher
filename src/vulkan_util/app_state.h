@@ -11,13 +11,15 @@
 enum class TestFunc : uint8_t {
     Parabolic   = 0,
     ShiftedSinc = 1,
-    NUM_FUNCS   = 2,
+    ExpSine     = 2,
+    NUM_FUNCS   = 3,
 };
 
 struct AppState {
     bool rotating        = true;
     bool wireframe       = false;
     bool pbrFragPipeline = true;
+    bool drawFloor       = true;
 
     glm::vec3 graphColor = {0.0f, 0.13f, 0.94f};
 
@@ -27,8 +29,8 @@ struct AppState {
     TestFunc testFunc = TestFunc::ShiftedSinc;
 
     void toggleTestFunc() {
-        testFunc =
-            static_cast<TestFunc>((static_cast<uint8_t>(testFunc) + 1) % static_cast<uint8_t>(TestFunc::NUM_FUNCS));
+        uint8_t numFuncs = static_cast<uint8_t>(TestFunc::NUM_FUNCS);
+        testFunc         = static_cast<TestFunc>((static_cast<uint8_t>(testFunc) + 1) % numFuncs);
     }
 };
 

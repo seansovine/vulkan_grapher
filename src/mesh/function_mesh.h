@@ -88,9 +88,12 @@ class FunctionMesh {
     static constexpr bool SHOW_REFINEMENT  = true;
     static constexpr bool DEBUG_REFINEMENT = false;
 
+    // Number of subdivisions of x,y axes when creating cells.
+    static constexpr int mNumCells = 400;
+
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 2;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
 
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
@@ -134,6 +137,46 @@ public:
         return mMeshIndices;
     }
 
+    struct VerticesAndIndices {
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+    };
+
+    static VerticesAndIndices simpleFloorMesh() {
+        return VerticesAndIndices{.vertices = {Vertex{
+                                                   .pos       = glm::vec3(0.0, 0.0, 0.0),
+                                                   .color     = FLOOR_COLOR,
+                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
+                                               },
+                                               Vertex{
+                                                   .pos       = glm::vec3(1.0, 0.0, 0.0),
+                                                   .color     = FLOOR_COLOR,
+                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
+                                               },
+                                               Vertex{
+                                                   .pos       = glm::vec3(1.0, 0.0, 1.0),
+                                                   .color     = FLOOR_COLOR,
+                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
+                                               },
+                                               Vertex{
+                                                   .pos       = glm::vec3(0.0, 0.0, 1.0),
+                                                   .color     = FLOOR_COLOR,
+                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
+                                               }},
+
+                                  .indices = {0, 2, 1, //
+                                              0, 3, 2}};
+    }
+
+public:
     // Mesh debugging methods.
 
     std::basic_ostream<char> &debugVertex(std::basic_ostream<char> &debugStrm, uint32_t vertex_i) {
@@ -355,9 +398,6 @@ private:
     static constexpr glm::vec3 FUNCT_COLOR         = {0.070f, 0.336f, 0.594f};
     static constexpr glm::vec3 REFINE_DEBUG_COLOR1 = {0.0f, 1.0f, 0.0f};
     static constexpr glm::vec3 REFINE_DEBUG_COLOR2 = {1.0f, 0.5f, 0.0f};
-
-    // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int mNumCells = 200;
 
     // Ensure we don't overlow our index type: This check is
     // necessary, but not sufficient, because of mesh refinement.
