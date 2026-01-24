@@ -3,6 +3,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <cassert>
+#include <iostream>
 #include <vector>
 
 // Data structs.
@@ -72,6 +74,45 @@ struct ImageInfo {
         vkDestroyImage(device, image, nullptr);
         vkFreeMemory(device, imageMemory, nullptr);
     }
+};
+
+struct DescriptorSetLayout {
+    DescriptorSetLayout() = default;
+
+    void init(VkDevice inDevice) {
+        device = inDevice;
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding            = 0;
+        uboLayoutBinding.descriptorCount    = 1;
+        uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings    = &uboLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
+
+    ~DescriptorSetLayout() {
+        if (layout != nullptr) {
+            std::cerr << "MeshDescriptorSetLayout must be explicitly destroyed." << std::endl;
+        }
+        assert(layout == nullptr);
+    }
+
+    void destroy() {
+        assert(device != nullptr);
+        vkDestroyDescriptorSetLayout(device, layout, nullptr);
+        layout = nullptr;
+    }
+
+    VkDevice device              = nullptr;
+    VkDescriptorSetLayout layout = nullptr;
 };
 
 #endif // VULKAN_OBJECTS_H_

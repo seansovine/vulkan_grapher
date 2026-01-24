@@ -1,5 +1,6 @@
 add_subdirectory(imgui)
 
+add_subdirectory(app)
 add_subdirectory(vulkan_util)
 add_subdirectory(mesh)
 add_subdirectory(dev)
@@ -18,11 +19,12 @@ SET(SRCS
 )
 
 add_executable(renderer-app ${HEADERS} ${SRCS})
-target_include_directories(renderer-app PUBLIC imgui)
+# target_include_directories(renderer-app PUBLIC imgui)
 target_link_libraries(renderer-app
 	glfw
 	Vulkan::Vulkan
 	imgui-renderer
 	glm::glm
+	app
 	mesh
 )

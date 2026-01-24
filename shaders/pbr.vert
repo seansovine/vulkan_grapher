@@ -3,17 +3,18 @@
 
 // Uniforms.
 
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
+layout(set = 0, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
-
     vec3 viewerPos;
-    vec3 meshColor;
+} cameraUbo;
 
+layout(set = 1, binding = 0) uniform ModelUniform {
+    mat4 model;
+    vec3 meshColor;
     float roughness;
     float metallic;
-} ubo;
+} modelUbo;
 
 // Inputs.
 
@@ -45,13 +46,13 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
 vec3 fresnelSchlick(float cosTheta, vec3 F0);
 
 void main() {
-    vec3 worldPos = vec3(ubo.model * vec4(inPosition, 1.0));
-    vec3 V = normalize(ubo.viewerPos - worldPos);
-    vec3 N = mat3(ubo.model) * inNormal;
+    vec3 worldPos = vec3(modelUbo.model * vec4(inPosition, 1.0));
+    vec3 V = normalize(cameraUbo.viewerPos - worldPos);
+    vec3 N = mat3(modelUbo.model) * inNormal;
 
-    vec3 albedo = ubo.meshColor;
+    vec3 albedo = modelUbo.meshColor;
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, ubo.metallic);
+    F0 = mix(F0, albedo, modelUbo.metallic);
 
     vec3 Lo = vec3(0.0);
     for(int i = 0; i < 2; ++i)
@@ -62,13 +63,13 @@ void main() {
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance     = lightColors[i] * attenuation;
 
-        float NDF = DistributionGGX(N, H, ubo.roughness);
-        float G   = GeometrySmith(N, V, L, ubo.roughness);
+        float NDF = DistributionGGX(N, H, modelUbo.roughness);
+        float G   = GeometrySmith(N, V, L, modelUbo.roughness);
         vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - ubo.metallic;
+        kD *= 1.0 - modelUbo.metallic;
 
         vec3 numerator    = NDF * G * F;
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
@@ -82,7 +83,7 @@ void main() {
     vec3 color = ambient + Lo;
 
     vOutColor = color;
-    gl_Position = ubo.proj * ubo.view * vec4(worldPos, 1.0);
+    gl_Position = cameraUbo.proj * cameraUbo.view * vec4(worldPos, 1.0);
 }
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)

@@ -1,6 +1,7 @@
 #ifndef VULKAN_WRAPPER_H_
 #define VULKAN_WRAPPER_H_
 
+#include "uniforms.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -43,7 +44,6 @@ private:
 
     // Image for multisampling.
     ImageInfo colorImageInfo;
-
     // Image for depth buffer;
     ImageInfo depthImageInfo;
 
@@ -61,7 +61,8 @@ private:
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    MeshDescriptorSetLayout descriptorSetLayout;
+    SceneInfo sceneUniform;
+    DescriptorSetLayout descriptorSetLayout;
     std::optional<IndexedMesh> graphMesh;
     std::optional<IndexedMesh> floorMesh;
 
@@ -80,7 +81,7 @@ private:
     using CreateUIFrameBuffersCallback  = void(GlfwVulkanWrapper &);
     using DestroyUIFrameBuffersCallback = void(GlfwVulkanWrapper &);
 
-    // UI callbacks for dependency injection.
+    // Using callbacks should let us use this with no GUI or different GUIs.
     std::function<DeinitUICallback> uiDeinitCallback;
     std::function<DrawUICallback> uiDrawCallback;
     std::function<CreateUIFrameBuffersCallback> createUIFrameBuffersCallback;
@@ -94,6 +95,7 @@ public:
     // Initialization functions.
     void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::array<IndexedMesh, 2> &meshData);
 
+    void initSceneUniform();
     void initMesh(IndexedMesh &mesh);
 
     // This moves out of meshData members and takes ownership of data.
@@ -189,7 +191,7 @@ private:
                             VkDeviceMemory &vertexBufferMemory);
     void createIndexBuffer(const std::vector<uint32_t> &indices, VkBuffer &indexBuffer,
                            VkDeviceMemory &indexBufferMemory);
-    void createUniformBuffers(UniformInfo &uniformInfo);
+    void createMeshUniformBuffers(UniformInfo &uniformInfo, VkDeviceSize bufferSize);
 
     void createCommandBuffers();
     void createSyncObjects();

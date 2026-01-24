@@ -3,22 +3,23 @@
 
 // Uniforms.
 
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 _model;
+layout(set = 0, binding = 0) uniform CameraUniform {
     mat4 _view;
     mat4 _proj;
-
     vec3 _viewerPos;
-    vec3 meshColor;
+} cameraUbo;
 
+layout(set = 1, binding = 0) uniform ModelUniform {
+    mat4 _model;
+    vec3 meshColor;
     float roughness;
     float metallic;
-} ubo;
+} modelUbo;
 
 // Inputs.
 
 struct VertexOut {
-    vec3 tangentLightOffset;
+    vec3 tangentLightOffset[2];
     vec3 tangentViewOffset;
 };
 
@@ -50,26 +51,26 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0);
 void main() {
     vec3 V = normalize(vIn.tangentViewOffset);
 
-    vec3 albedo = ubo.meshColor;
+    vec3 albedo = modelUbo.meshColor;
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, ubo.metallic);
+    F0 = mix(F0, albedo, modelUbo.metallic);
 
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 1; ++i) // TODO: Make array of lights.
+    for(int i = 0; i < 2; ++i)
     {
-        vec3 L = normalize(vIn.tangentLightOffset);
+        vec3 L = normalize(vIn.tangentLightOffset[i]);
         vec3 H = normalize(V + L);
         float distance    = length(L);
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance     = lightColor * attenuation;
 
-        float NDF = DistributionGGX(N, H, ubo.roughness);
-        float G   = GeometrySmith(N, V, L, ubo.roughness);
+        float NDF = DistributionGGX(N, H, modelUbo.roughness);
+        float G   = GeometrySmith(N, V, L, modelUbo.roughness);
         vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - ubo.metallic;
+        kD *= 1.0 - modelUbo.metallic;
 
         vec3 numerator    = NDF * G * F;
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;

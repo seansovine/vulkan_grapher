@@ -4,8 +4,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "app_state.h"
 #include "imgui_vulkan_data.h"
-#include "vulkan_util/app_state.h"
 #include "vulkan_wrapper.h"
 
 #include <array>
@@ -20,7 +20,6 @@ class Application {
 
 public:
     Application();
-
     ~Application();
 
     void run();
@@ -45,6 +44,7 @@ private:
 
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
+    WindowEvents windowEvents;
 };
 
 #endif // APPLICATION_H_

@@ -143,37 +143,41 @@ public:
     };
 
     static VerticesAndIndices simpleFloorMesh() {
-        return VerticesAndIndices{.vertices = {Vertex{
-                                                   .pos       = glm::vec3(0.0, 0.0, 0.0),
-                                                   .color     = FLOOR_COLOR,
-                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
-                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
-                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
-                                               },
-                                               Vertex{
-                                                   .pos       = glm::vec3(1.0, 0.0, 0.0),
-                                                   .color     = FLOOR_COLOR,
-                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
-                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
-                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
-                                               },
-                                               Vertex{
-                                                   .pos       = glm::vec3(1.0, 0.0, 1.0),
-                                                   .color     = FLOOR_COLOR,
-                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
-                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
-                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
-                                               },
-                                               Vertex{
-                                                   .pos       = glm::vec3(0.0, 0.0, 1.0),
-                                                   .color     = FLOOR_COLOR,
-                                                   .tangent   = glm::vec3(1.0, 0.0, 0.0),
-                                                   .bitangent = glm::vec3(0.0, 0.0, 1.0),
-                                                   .normal    = glm::vec3(0.0, 1.0, 0.0),
-                                               }},
+        return VerticesAndIndices{
+            .vertices =
+                {//
+                 Vertex{
+                     .pos       = glm::vec3(0.0, 0.0, 0.0),
+                     .color     = FLOOR_COLOR,
+                     .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                     .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                     .normal    = glm::vec3(0.0, 1.0, 0.0),
+                 },
+                 Vertex{
+                     .pos       = glm::vec3(1.0, 0.0, 0.0),
+                     .color     = FLOOR_COLOR,
+                     .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                     .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                     .normal    = glm::vec3(0.0, 1.0, 0.0),
+                 },
+                 Vertex{
+                     .pos       = glm::vec3(1.0, 0.0, 1.0),
+                     .color     = FLOOR_COLOR,
+                     .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                     .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                     .normal    = glm::vec3(0.0, 1.0, 0.0),
+                 },
+                 Vertex{
+                     .pos       = glm::vec3(0.0, 0.0, 1.0),
+                     .color     = FLOOR_COLOR,
+                     .tangent   = glm::vec3(1.0, 0.0, 0.0),
+                     .bitangent = glm::vec3(0.0, 0.0, 1.0),
+                     .normal    = glm::vec3(0.0, 1.0, 0.0),
+                 }},
 
-                                  .indices = {0, 2, 1, //
-                                              0, 3, 2}};
+            .indices = {0, 2, 1, //
+                        0, 3, 2} //
+        };
     }
 
 public:

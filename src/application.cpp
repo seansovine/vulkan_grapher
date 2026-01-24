@@ -5,6 +5,7 @@
 #include "mesh.h"
 #include "vulkan_wrapper.h"
 
+#include <GLFW/glfw3.h>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
@@ -39,6 +40,11 @@ Application::Application() {
     initWindow();
     initVulkan();
     initUI();
+
+    // Setup event handling.
+    windowEvents.initGlfw(window);
+    // glfwSetMouseButtonCallback(window, WindowEvents::mouseButtonCallback);
+    // glfwSetCursorPosCallback(window, WindowEvents::mousePositionCallback);
 }
 
 Application::~Application() {
@@ -123,8 +129,8 @@ void Application::populateFunctionMeshes() {
         std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
 
         auto floorMesh = FunctionMesh::simpleFloorMesh();
-        meshesToRender = {IndexedMesh{mesh.functionVertices(), mesh.meshIndices()},
-                          IndexedMesh{floorMesh.vertices, floorMesh.indices}};
+        meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                          IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
     };
 
     std::cout << "Building function meshes." << std::endl;
@@ -149,16 +155,7 @@ void Application::populateFunctionMeshes() {
 }
 
 void Application::initVulkan() {
-    // Set false for very basic mesh debugging.
-    static constexpr bool RENDER_FUNCTION = true;
-
-    if (RENDER_FUNCTION) {
-        populateFunctionMeshes();
-
-    } else {
-        meshesToRender = {IndexedMesh{TEST_VERTICES_1, TEST_INDICES}, IndexedMesh{TEST_VERTICES_2, TEST_INDICES}};
-    }
-
+    populateFunctionMeshes();
     vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, meshesToRender);
     meshesToRender = {};
 }
@@ -188,6 +185,8 @@ void Application::run() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         drawUI();
+        ImGuiIO &io = ImGui::GetIO();
+        windowEvents.setGuiWantsInputs(io.WantCaptureMouse);
         drawFrame();
 
         // Limit frame computation rate, as we target 60 FPS.

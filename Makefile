@@ -1,13 +1,15 @@
 format:
 	@find src/ -regex '.*\.\(cpp\|hpp\|c\|h\|cc\|hh\|cxx\|hxx\)' -exec clang-format -style=file -i {} \;
 
-.PHONY: build
+.PHONY: build configure configure-debug
 build: src
 	@cmake --build build/
 
-.PHONY: configure
 configure: src
 	@cmake . -DCMAKE_BUILD_TYPE=Release -B build
+
+configure-debug: src
+	@cmake . -DCMAKE_BUILD_TYPE=Debug -B build
 
 run:
 	@build/src/renderer-app

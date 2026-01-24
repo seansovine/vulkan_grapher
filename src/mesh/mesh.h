@@ -17,7 +17,6 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <vector>
 
 struct Vertex {
@@ -69,45 +68,6 @@ struct Vertex {
     }
 };
 
-struct MeshDescriptorSetLayout {
-    MeshDescriptorSetLayout() = default;
-
-    void init(VkDevice inDevice) {
-        device = inDevice;
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding            = 0;
-        uboLayoutBinding.descriptorCount    = 1;
-        uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings    = &uboLayoutBinding;
-
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
-        }
-    }
-
-    ~MeshDescriptorSetLayout() {
-        if (layout != nullptr) {
-            std::cerr << "MeshDescriptorSetLayout must be explicitly destroyed." << std::endl;
-        }
-        assert(layout == nullptr);
-    }
-
-    void destroy() {
-        assert(device != nullptr);
-        vkDestroyDescriptorSetLayout(device, layout, nullptr);
-        layout = nullptr;
-    }
-
-    VkDevice device              = nullptr;
-    VkDescriptorSetLayout layout = nullptr;
-};
-
 struct IndexedMesh {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -118,11 +78,23 @@ struct IndexedMesh {
     VkDeviceMemory indexBufferMemory;
     uint32_t numIndices;
 
+    static constexpr float ROT_RADS_PER_SEC = 22.5f;
+
     UniformInfo uniformInfo;
+    ModelUniform ubo{};
+    bool needsUniformWrite = true;
 
     VkDescriptorPool descriptorPool;
-    MeshDescriptorSetLayout descriptorSetLayout;
+    DescriptorSetLayout descriptorSetLayout;
     std::vector<VkDescriptorSet> descriptorSets;
+
+public:
+    IndexedMesh() = default;
+
+    IndexedMesh(std::vector<Vertex> &&inVertices, std::vector<uint32_t> &&inIndices)
+        : vertices{std::forward<std::vector<Vertex>>(inVertices)},
+          indices{std::forward<std::vector<uint32_t>>(inIndices)} {
+    }
 
     void createDescriptorSetLayout(VkDevice device) {
         descriptorSetLayout.init(device);
@@ -161,7 +133,7 @@ struct IndexedMesh {
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = uniformInfo.uniformBuffers[i];
             bufferInfo.offset = 0;
-            bufferInfo.range  = sizeof(TransformsUniform);
+            bufferInfo.range  = sizeof(ModelUniform);
 
             VkWriteDescriptorSet descriptorWrite{};
             descriptorWrite.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -174,6 +146,10 @@ struct IndexedMesh {
 
             vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
         }
+    }
+
+    bool needsUniformBufferWrite() {
+        return needsUniformWrite;
     }
 
     void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio, glm::vec3 color) {
@@ -189,26 +165,12 @@ struct IndexedMesh {
             time = lastTime;
         }
 
-        static constexpr float ROT_RADS_PER_SEC = 22.5f;
-        static constexpr float DIST_COMP        = 1.5f;
-        static constexpr glm::vec3 VIEWER_POS   = glm::vec3(0.0f, DIST_COMP, DIST_COMP);
-
-        TransformsUniform ubo{};
-
         // Update MVP matrices.
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(ROT_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
-        ubo.view  = glm::lookAt(VIEWER_POS, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.proj  = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
-
-        // Correct orientation.
-        ubo.proj[1][1] *= -1;
 
         // Update mesh color.
         ubo.meshColor = color;
-        // Set viewer position; constant for now.
-        ubo.viewerPos = VIEWER_POS;
-
         ubo.metallic  = appState.metallic;
         ubo.roughness = appState.roughness;
 

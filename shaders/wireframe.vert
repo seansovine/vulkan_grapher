@@ -2,14 +2,18 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 // Uniforms.
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
+layout(set = 0, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
+    vec3 viewerPos;
+} cameraUbo;
 
-    // Currently unused by this pipeline.
+layout(set = 1, binding = 0) uniform ModelUniform {
+    mat4 model;
     vec3 meshColor;
-} ubo;
+    float _roughness;
+    float _metallic;
+} modelUbo;
 
 // Inputs.
 layout(location = 0) in vec3 inPosition;
@@ -22,6 +26,6 @@ layout(location = 4) in vec3 inNormal;
 layout(location = 0) out vec3 fragColor;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    gl_Position = cameraUbo.proj * cameraUbo.view * modelUbo.model * vec4(inPosition, 1.0);
     fragColor = inColor;
 }
