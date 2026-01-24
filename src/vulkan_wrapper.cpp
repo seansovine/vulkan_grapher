@@ -186,14 +186,22 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
     }
 
     float aspectRatio = swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height;
-    if (sceneUniform.needsUniformBufferWrite()) {
+    if (sceneUniform.needsUniformBufferWrite(currentFrame)) {
         sceneUniform.updateUniformBuffer(currentFrame, aspectRatio);
     }
+
+    graphMesh->applyTimedRotation();
+    graphMesh->updateFromAppState(appState);
+    graphMesh->updateColor(appState.graphColor);
     if (graphMesh.has_value() && graphMesh->needsUniformBufferWrite()) {
-        graphMesh->updateUniformBuffer(currentFrame, appState, aspectRatio, appState.graphColor);
+        graphMesh->updateUniformBuffer(currentFrame);
     }
+
+    // floorMesh->applyTimedRotation();
+    floorMesh->updateFromAppState(appState);
+    floorMesh->updateColor(floorMesh->vertices[0].color);
     if (floorMesh.has_value() && floorMesh->needsUniformBufferWrite()) {
-        floorMesh->updateUniformBuffer(currentFrame, appState, aspectRatio, floorMesh->vertices[0].color);
+        floorMesh->updateUniformBuffer(currentFrame);
     }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);

@@ -36,7 +36,9 @@ struct CameraUniform {
 struct SceneInfo {
     UniformInfo uniformInfo;
     CameraUniform ubo;
-    bool needsBufferWrite;
+
+    // THis is currently not changed after first write.
+    std::vector<bool> needsBufferWrite;
 
     VkDescriptorPool descriptorPool;
     DescriptorSetLayout descriptorSetLayout;
@@ -66,6 +68,9 @@ public:
         if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("Unable to create descriptor pool!");
         }
+
+        // A bit awkward here but it works.
+        needsBufferWrite = std::vector<bool>(numDescriptorSets, true);
     }
 
     void createDescriptorSets(VkDevice device, uint32_t numDescriptorSets) {
@@ -100,8 +105,8 @@ public:
         }
     }
 
-    bool needsUniformBufferWrite() {
-        return needsBufferWrite;
+    bool needsUniformBufferWrite(uint32_t currentImage) {
+        return needsBufferWrite[currentImage];
     }
 
     void updateUniformBuffer(uint32_t currentImage, float aspectRatio) {
@@ -111,6 +116,7 @@ public:
         ubo.proj[1][1] *= -1;
 
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+        needsBufferWrite[currentImage] = false;
     }
 
     void destroyResources(VkDevice device) {

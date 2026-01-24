@@ -78,15 +78,21 @@ struct IndexedMesh {
     VkDeviceMemory indexBufferMemory;
     uint32_t numIndices;
 
-    static constexpr float ROT_RADS_PER_SEC = 22.5f;
+    static constexpr float ROT_RADS_PER_SEC          = 22.5f;
+    static constexpr glm::vec3 DEFAULT_MESH_POSITION = {-0.5f, -0.25f, -0.5f};
 
     UniformInfo uniformInfo;
     ModelUniform ubo{};
+
+    // TODO: To use this it would have to be per image as in SceneInfo.
     bool needsUniformWrite = true;
 
     VkDescriptorPool descriptorPool;
     DescriptorSetLayout descriptorSetLayout;
     std::vector<VkDescriptorSet> descriptorSets;
+
+    using time_point     = decltype(std::chrono::high_resolution_clock::now());
+    time_point startTime = std::chrono::high_resolution_clock::now();
 
 public:
     IndexedMesh() = default;
@@ -94,6 +100,7 @@ public:
     IndexedMesh(std::vector<Vertex> &&inVertices, std::vector<uint32_t> &&inIndices)
         : vertices{std::forward<std::vector<Vertex>>(inVertices)},
           indices{std::forward<std::vector<uint32_t>>(inIndices)} {
+        applyTimedRotation();
     }
 
     void createDescriptorSetLayout(VkDevice device) {
@@ -149,31 +156,31 @@ public:
     }
 
     bool needsUniformBufferWrite() {
-        return needsUniformWrite;
+        return true; // needsUniformWrite;
     }
 
-    void updateUniformBuffer(uint32_t currentImage, const AppState &appState, float aspectRatio, glm::vec3 color) {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-        static float lastTime = 0.0f;
+    void updateFromAppState(const AppState &appState) {
+        ubo.metallic      = appState.metallic;
+        ubo.roughness     = appState.roughness;
+        needsUniformWrite = true;
+    }
 
-        float time;
-        if (appState.rotating) {
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            time     = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-            lastTime = time;
-        } else {
-            time = lastTime;
-        }
+    void updateColor(glm::vec3 color) {
+        ubo.meshColor     = color;
+        needsUniformWrite = true;
+    }
 
-        // Update MVP matrices.
+    void applyTimedRotation() {
+        time_point currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<double, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        // Update model matrix.
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(ROT_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.model = glm::translate(ubo.model, glm::vec3{-0.5f, -0.25f, -0.5f});
+        ubo.model = glm::translate(ubo.model, DEFAULT_MESH_POSITION);
+        needsUniformWrite = true;
+    }
 
-        // Update mesh color.
-        ubo.meshColor = color;
-        ubo.metallic  = appState.metallic;
-        ubo.roughness = appState.roughness;
-
+    void updateUniformBuffer(uint32_t currentImage) {
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
@@ -192,31 +199,6 @@ public:
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         descriptorSetLayout.destroy();
     }
-};
-
-// Test data for development.
-
-enum class TestVertexSet {
-    TEST_VERTICES_1,
-    TEST_VERTICES_2,
-};
-
-// clang-format off
-static const std::vector<Vertex> TEST_VERTICES_1 = {
-    Vertex{{ 0.0f, -0.5f, -0.25f}, {1.0f, 0.0f, 0.0f}}, //
-    Vertex{{ 0.5f,  0.5f, -0.25f}, {0.0f, 1.0f, 0.0f}}, //
-    Vertex{{-0.5f,  0.5f, -0.25f}, {0.0f, 0.0f, 1.0f}}  //
-};
-
-static const std::vector<Vertex> TEST_VERTICES_2 = {
-    Vertex{{ 0.0f, -0.5f, 0.25f}, {1.0f, 1.0f, 1.0f}}, //
-    Vertex{{ 0.5f,  0.5f, 0.25f}, {0.0f, 1.0f, 0.0f}}, //
-    Vertex{{-0.5f,  0.5f, 0.25f}, {0.0f, 0.0f, 1.0f}}  //
-};
-// clang-format on
-
-static const std::vector<uint32_t> TEST_INDICES = {
-    0, 1, 2 //
 };
 
 #endif
