@@ -1,4 +1,5 @@
 #include "vulkan_wrapper.h"
+#include "app_state.h"
 
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan_core.h>
@@ -182,8 +183,10 @@ void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
+    UserInput userInput = appState.takeUserInput();
+
     double aspectRatio = swapChainInfo.swapChainExtent.width / (double)swapChainInfo.swapChainExtent.height;
-    sceneUniform.applyUserZoom(appState.takeUserScroll());
+    sceneUniform.applyUserZoom(userInput.userScroll);
     sceneUniform.setApsectRatio(aspectRatio);
     if (sceneUniform.needsUniformBufferWrite(currentFrame)) {
         sceneUniform.updateUniformBuffer(currentFrame);
@@ -191,8 +194,13 @@ void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
 
     if (graphMesh.has_value()) {
         MeshController &controller = graphMesh->controller;
+        if (appState.resetPosition) {
+            controller.reset();
+            appState.resetPosition = false;
+        }
         controller.setPauseRotation(appState.mouseInteracting || !appState.rotating);
-        controller.applyUserRotation(appState.takeUserRotation());
+        controller.applyUserRotation({userInput.xUserRot, userInput.yUserRot});
+        controller.applyUserTranslation(userInput.xUserTrans, userInput.yUserTrans);
         controller.applyTimedRotation();
         controller.updateFromAppState(appState);
         controller.updateColor(appState.graphColor);
@@ -203,7 +211,7 @@ void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
 
     if (floorMesh.has_value()) {
         MeshController &controller = floorMesh->controller;
-        controller.syncRotation(floorMesh.has_value() ? floorMesh->controller.yRotRad : 0.0);
+        controller.syncYRotation(floorMesh.has_value() ? floorMesh->controller.yRotRad : 0.0);
         controller.updateColor(floorMesh->getVertColor());
         if (floorMesh->needsUniformBufferWrite()) {
             floorMesh->updateUniformBuffer(currentFrame);

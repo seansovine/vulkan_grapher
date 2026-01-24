@@ -75,8 +75,10 @@ class MeshController {
     static constexpr glm::vec3 DEFAULT_MESH_POSITION = {-0.5f, -0.25f, -0.5f};
     static constexpr double ROT_RADS_PER_SEC         = std::numbers::pi / 8.0;
     static constexpr double USER_ROT_SPEED           = 0.0125;
+    static constexpr double USER_TRANS_SPEED         = 0.01;
 
     ModelUniform ubo{};
+    glm::vec3 meshPosition = {0.0f, 0.0f, 0.0f};
 
     bool rotationPaused = true;
     // TODO: To use this it would have to be per image as in SceneInfo.
@@ -116,15 +118,25 @@ public:
         lastUpdateTime = std::chrono::high_resolution_clock::now();
     }
 
-    void syncRotation(double inYRotRad) {
+    void syncYRotation(double inYRotRad) {
         yRotRad = inYRotRad;
+    }
+
+    void reset() {
+        xRotRad      = 0;
+        yRotRad      = 0;
+        meshPosition = {0.0f, 0.0f, 0.0f};
+        updateMatrix();
     }
 
     void updateMatrix() {
         // Update model matrix.
-        ubo.model = glm::rotate(glm::mat4(1.0f), static_cast<float>(yRotRad), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::mat4(1.0f);
+        ubo.model = glm::translate(ubo.model, meshPosition);
+        ubo.model = glm::rotate(ubo.model, static_cast<float>(yRotRad), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.model = glm::rotate(ubo.model, static_cast<float>(-xRotRad), glm::vec3(1.0f, 0.0f, 0.0f));
         ubo.model = glm::translate(ubo.model, DEFAULT_MESH_POSITION);
+        // auto inversePosition  = glm::vec3(glm::inverse(ubo.model) * glm::vec4(meshPosition, 0));
     }
 
     void applyUserRotation(const std::pair<double, double> userRot) {
@@ -133,6 +145,15 @@ public:
         }
         yRotRad = yRotRad + userRot.first * USER_ROT_SPEED;
         xRotRad = xRotRad + userRot.second * USER_ROT_SPEED;
+        updateMatrix();
+    }
+
+    void applyUserTranslation(double dx, double dy) {
+        if (dx == 0 && dy == 0) {
+            return;
+        }
+        meshPosition.x += dx * USER_TRANS_SPEED;
+        meshPosition.y -= dy * USER_TRANS_SPEED;
         updateMatrix();
     }
 

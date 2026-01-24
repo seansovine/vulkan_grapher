@@ -1,16 +1,15 @@
 #ifndef APP_STATE_H_
 #define APP_STATE_H_
 
-#include <GLFW/glfw3.h>
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
+
+#include <GLFW/glfw3.h>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 
-#include <array>
-#include <cstdint>
-#include <utility>
-
-// Built-in functions; we will add an expression parser.
 enum class TestFunc : uint8_t {
     Parabolic   = 0,
     ShiftedSinc = 1,
@@ -26,6 +25,14 @@ static constexpr std::array<const char *, static_cast<size_t>(TestFunc::NUM_FUNC
     "User input",  //
 };
 
+struct UserInput {
+    double xUserRot   = 0.0;
+    double yUserRot   = 0.0;
+    double userScroll = 0.0;
+    double xUserTrans = 0.0;
+    double yUserTrans = 0.0;
+};
+
 struct AppState {
     // Function selection.
     TestFunc testFunc = TestFunc::ShiftedSinc;
@@ -35,6 +42,7 @@ struct AppState {
     bool wireframe       = false;
     bool pbrFragPipeline = true;
     bool drawFloor       = false;
+    bool resetPosition   = false;
 
     // Mesh parameters.
     glm::vec3 graphColor = {0.0f, 0.13f, 0.94f};
@@ -43,9 +51,7 @@ struct AppState {
 
     // User interaction state.
     bool mouseInteracting = false;
-    double xUserRot       = 0.0;
-    double yUserRot       = 0.0;
-    double userScroll     = 0.0;
+    UserInput userInput   = {};
 
 public:
     void toggleTestFunc() {
@@ -53,17 +59,10 @@ public:
         testFunc         = static_cast<TestFunc>((static_cast<uint8_t>(testFunc) + 1) % numFuncs);
     }
 
-    std::pair<double, double> takeUserRotation() {
-        std::pair<double, double> ret = {xUserRot, yUserRot};
-        xUserRot                      = 0.0;
-        yUserRot                      = 0.0;
-        return ret;
-    }
-
-    double takeUserScroll() {
-        double scroll = userScroll;
-        userScroll    = 0.0;
-        return scroll;
+    UserInput takeUserInput() {
+        UserInput returnVal = userInput;
+        userInput           = {};
+        return returnVal;
     }
 
     size_t selectedFuncIndex() {
@@ -78,7 +77,7 @@ class WindowEvents {
     double lastMouseY;
 
     // Keyboard state.
-    bool controlPressed = false;
+    bool controlDown = false;
     // Let ImGui capture some events.
     bool imGuiWantsMouse = false;
 
@@ -91,6 +90,7 @@ public:
         glfwSetMouseButtonCallback(window, WindowEvents::mouseButtonCallback);
         glfwSetCursorPosCallback(window, WindowEvents::mousePositionCallback);
         glfwSetScrollCallback(window, WindowEvents::mouseScrollCallback);
+        glfwSetKeyCallback(window, WindowEvents::keyboardCallback);
     }
 
     void setGuiWantsInputs(bool wantsMouse) {
@@ -98,15 +98,19 @@ public:
     }
 
     void applyMousePositionChange(double dx, double dy) {
-        if (!controlPressed) {
-            appState->xUserRot = dx;
-            appState->yUserRot = dy;
+        if (!controlDown) {
+            appState->userInput.xUserRot = dx;
+            appState->userInput.yUserRot = dy;
+        } else {
+            // Clamp to work around apparent glfw bug causing large jumps.
+            constexpr double MAX_ALLOWED_MOVE = 20.0;
+            appState->userInput.xUserTrans    = std::clamp(dx, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
+            appState->userInput.yUserTrans    = std::clamp(dy, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
         }
-        // TODO: Control + drag will do translation.
     }
 
     void applyScrollChange(double dy) {
-        appState->userScroll = dy;
+        appState->userInput.userScroll = dy;
     }
 
 public:
@@ -116,9 +120,11 @@ public:
 
     static void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
         WindowEvents *thisPtr = getThisPtr(window);
+        if (thisPtr->imGuiWantsMouse) {
+            return;
+        }
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (action == GLFW_PRESS && !thisPtr->imGuiWantsMouse) {
-                // TODO: Get ImGui io and check it wants event.
+            if (action == GLFW_PRESS) {
                 thisPtr->leftMousePressed           = true;
                 thisPtr->appState->mouseInteracting = true;
                 glfwGetCursorPos(window, &thisPtr->lastMouseX, &thisPtr->lastMouseX);
@@ -131,18 +137,36 @@ public:
 
     static void mousePositionCallback(GLFWwindow *window, double xpos, double ypos) {
         WindowEvents *thisPtr = getThisPtr(window);
-        double dx             = xpos - thisPtr->lastMouseX;
-        double dy             = ypos - thisPtr->lastMouseY;
-        thisPtr->lastMouseX   = xpos;
-        thisPtr->lastMouseY   = ypos;
+        if (thisPtr->imGuiWantsMouse) {
+            return;
+        }
         if (thisPtr->leftMousePressed) {
+            double dx           = xpos - thisPtr->lastMouseX;
+            double dy           = ypos - thisPtr->lastMouseY;
+            thisPtr->lastMouseX = xpos;
+            thisPtr->lastMouseY = ypos;
             thisPtr->applyMousePositionChange(dx, dy);
         }
     }
 
     static void mouseScrollCallback(GLFWwindow *window, double _dx, double dy) {
         WindowEvents *thisPtr = getThisPtr(window);
+        if (thisPtr->imGuiWantsMouse) {
+            return;
+        }
         thisPtr->applyScrollChange(dy);
+    }
+
+    static void keyboardCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+        if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+        WindowEvents *thisPtr = getThisPtr(window);
+        if (action == GLFW_PRESS && key == 341) {
+            thisPtr->controlDown = true;
+        } else if (action == GLFW_RELEASE && key == 341) {
+            thisPtr->controlDown = false;
+        }
     }
 };
 

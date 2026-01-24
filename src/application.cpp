@@ -28,12 +28,6 @@ void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
     app->framebufferResized = true;
 }
 
-static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-}
-
 // Class methods.
 
 Application::Application() {
@@ -175,7 +169,6 @@ void Application::initWindow() {
 
     // Have GLFW store a pointer to this class instance for use in callbacks.
     glfwSetWindowUserPointer(window, this);
-    glfwSetKeyCallback(window, keyCallback);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
     if (!window) {
@@ -238,6 +231,11 @@ void Application::drawUI() {
         if (populateFunctionMeshes()) {
             vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[selectedItem]);
         }
+    }
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+    if (ImGui::Button("Reset position")) {
+        appState.resetPosition = true;
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
