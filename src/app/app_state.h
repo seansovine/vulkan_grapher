@@ -98,11 +98,12 @@ public:
     }
 
     void applyMousePositionChange(double dx, double dy) {
+        // Clamp to work around apparent glfw bug causing large jumps.
         if (!controlDown) {
-            appState->userInput.xUserRot = dx;
-            appState->userInput.yUserRot = dy;
+            constexpr double MAX_ALLOWED_ROTATION = 20.0;
+            appState->userInput.xUserRot          = std::clamp(dx, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
+            appState->userInput.yUserRot          = std::clamp(dy, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
         } else {
-            // Clamp to work around apparent glfw bug causing large jumps.
             constexpr double MAX_ALLOWED_MOVE = 20.0;
             appState->userInput.xUserTrans    = std::clamp(dx, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
             appState->userInput.yUserTrans    = std::clamp(dy, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
