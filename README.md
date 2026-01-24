@@ -11,6 +11,14 @@ and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](http
 
 _Graph of radial sinc function._
 
+## Mouse controls
+
+| Input                    | Action            |
+| ------------------------ | ----------------- |
+| `click + drag`           | rotate graph      |
+| `control + click + drag` | translate graph   |
+| `mouse wheel`            | zoom graph        |
+
 ## Mesh refinement
 
 The basic mesh generated for a graph looks much rougher in parts where the function --
@@ -47,11 +55,9 @@ Next we will add these graphing features:
 
 1. Integrate a mathematical expression parsing library.
 
-2. Add better user interaction features like mouse control of the view.
+2. Keep looking at ways to improve the mesh quality for round surfaces.
 
-3. Add more user control of graphing and render parameters.
-
-4. Keep looking at ways to improve the mesh quality for round surfaces.
+3. Look into ways to improve the renderer efficiency.
 
 ## Sources and credits
 
