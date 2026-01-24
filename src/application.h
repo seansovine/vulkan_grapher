@@ -15,9 +15,6 @@
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 
-    AppState appState;
-    std::array<IndexedMesh, 2> meshesToRender;
-
 public:
     Application();
     ~Application();
@@ -31,8 +28,7 @@ private:
 
     void drawUI();
     void drawFrame();
-
-    void populateFunctionMeshes();
+    bool populateFunctionMeshes();
 
 private:
     const uint32_t INITIAL_WINDOW_WIDTH  = 1500;
@@ -41,6 +37,9 @@ private:
     bool framebufferResized = false;
 
     GLFWwindow *window;
+
+    AppState appState;
+    std::array<IndexedMesh, 2> meshesToRender;
 
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;

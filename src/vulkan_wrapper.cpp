@@ -20,8 +20,7 @@
 
 // State management functions.
 
-void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight,
-                             std::array<IndexedMesh, 2> &meshData) {
+void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint32_t inWindowHeight) {
     assert(inWindow);
     window = inWindow;
 
@@ -50,8 +49,6 @@ void GlfwVulkanWrapper::init(GLFWwindow *inWindow, uint32_t inWindowWidth, uint3
     createCommandPool();
     createCommandBuffers();
     createSyncObjects();
-
-    updateGraphAndFloorMeshes(meshData);
 }
 
 void GlfwVulkanWrapper::initSceneUniform() {
@@ -91,7 +88,7 @@ void GlfwVulkanWrapper::updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMes
     // should take longer than copying it to the device.
 }
 
-void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData) {
+void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData, const std::string &id) {
     if (graphMesh.has_value()) {
         updateMesh(newMeshData[0], graphMesh.value());
     } else {

@@ -2,9 +2,11 @@
 #define APP_STATE_H_
 
 #include <GLFW/glfw3.h>
+#include <cstddef>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -13,7 +15,15 @@ enum class TestFunc : uint8_t {
     Parabolic   = 0,
     ShiftedSinc = 1,
     ExpSine     = 2,
-    NUM_FUNCS   = 3,
+    UserInput   = 3,
+    NUM_FUNCS   = 4,
+};
+
+static constexpr std::array<const char *, static_cast<size_t>(TestFunc::NUM_FUNCS)> funcNames = {
+    "Parabolic",   //
+    "Sinc",        //
+    "Exp of sine", //
+    "User input",  //
 };
 
 struct AppState {
@@ -21,10 +31,10 @@ struct AppState {
     TestFunc testFunc = TestFunc::ShiftedSinc;
 
     // Render preferences.
-    bool rotating        = true;
+    bool rotating        = false;
     bool wireframe       = false;
     bool pbrFragPipeline = true;
-    bool drawFloor       = true;
+    bool drawFloor       = false;
 
     // Mesh parameters.
     glm::vec3 graphColor = {0.0f, 0.13f, 0.94f};
@@ -54,6 +64,10 @@ public:
         double scroll = userScroll;
         userScroll    = 0.0;
         return scroll;
+    }
+
+    size_t selectedFuncIndex() {
+        return static_cast<size_t>(testFunc);
     }
 };
 

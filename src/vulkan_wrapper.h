@@ -93,13 +93,13 @@ public:
 
 public:
     // Initialization functions.
-    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight, std::array<IndexedMesh, 2> &meshData);
+    void init(GLFWwindow *window, uint32_t windowWidth, uint32_t windowHeight);
 
     void initSceneUniform();
     void initMesh(IndexedMesh &mesh);
 
     // This moves out of meshData members and takes ownership of data.
-    void updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &meshData);
+    void updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &meshData, const std::string &id);
     void updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMesh);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {

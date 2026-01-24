@@ -100,7 +100,7 @@ void Application::initUI() {
         });
 }
 
-void Application::populateFunctionMeshes() {
+bool Application::populateFunctionMeshes() {
     static auto TEST_FUNCTION_PARABOLIC = [](double x, double z) -> double {
         return 0.75 - (x - 0.5) * (x - 0.5) - (z - 0.5) * (z - 0.5);
     };
@@ -147,15 +147,21 @@ void Application::populateFunctionMeshes() {
         populate(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
         break;
     }
+    case TestFunc::UserInput: {
+        std::cerr << "User-defined function not yet implemented." << std::endl;
+        return false;
+    }
     default: {
         throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
     }
     }
+    return true;
 }
 
 void Application::initVulkan() {
     populateFunctionMeshes();
-    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, meshesToRender);
+    vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
+    vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[appState.selectedFuncIndex()]);
     meshesToRender = {};
 }
 
@@ -209,7 +215,6 @@ void Application::drawUI() {
     ImGui::Begin("Settings");
     ImGui::Text("Average framerate: %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
-
     // Add some vertical space.
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
@@ -222,22 +227,24 @@ void Application::drawUI() {
     if (ImGui::Button("Toggle PBR in Vertex")) {
         appState.pbrFragPipeline = !appState.pbrFragPipeline;
     }
-    if (ImGui::Button("Toggle Test Function")) {
-        appState.toggleTestFunc();
-        populateFunctionMeshes();
-        vulkan.updateGraphAndFloorMeshes(meshesToRender);
-    }
     if (ImGui::Button("Toggle Draw Floor")) {
         appState.drawFloor = !appState.drawFloor;
     }
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
+    static int selectedItem = appState.selectedFuncIndex();
+    if (ImGui::Combo("Choose function", &selectedItem, funcNames.data(), funcNames.size())) {
+        appState.testFunc = static_cast<TestFunc>(selectedItem);
+        if (populateFunctionMeshes()) {
+            vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[selectedItem]);
+        }
+    }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
     // PBR graph color.
     ImGui::SliderFloat("Graph color R", &appState.graphColor.r, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Graph color G", &appState.graphColor.g, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Graph color B", &appState.graphColor.b, 0.0f, 1.0f, "%.2f");
-
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
     // PBR material parameters.
