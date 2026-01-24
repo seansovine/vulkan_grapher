@@ -5,6 +5,7 @@
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
@@ -24,6 +25,8 @@ struct ModelUniform {
 static constexpr float DIST_COMP              = 1.5f;
 static constexpr glm::vec3 DEFAULT_VIEWER_POS = glm::vec3(0.0f, DIST_COMP, DIST_COMP);
 
+static constexpr double USER_ZOOM_RATE = 0.025;
+
 struct CameraUniform {
     glm::mat4 view;
     glm::mat4 proj;
@@ -36,6 +39,7 @@ struct CameraUniform {
 struct SceneInfo {
     UniformInfo uniformInfo;
     CameraUniform ubo;
+    double aspectRatio = 0.0;
 
     // THis is currently not changed after first write.
     std::vector<bool> needsBufferWrite;
@@ -48,6 +52,38 @@ public:
     SceneInfo() {
         // Set viewer position; constant for now.
         ubo.viewerPos = DEFAULT_VIEWER_POS;
+        updateMatrix();
+    }
+
+    void applyUserZoom(double dz) {
+        if (dz == 0.0) {
+            return;
+        }
+        ubo.viewerPos = static_cast<float>(1.0 - dz * USER_ZOOM_RATE) * ubo.viewerPos;
+        updateMatrix();
+        setNeedsWrite();
+    }
+
+    void setApsectRatio(double inRatio) {
+        if (inRatio != aspectRatio) {
+            aspectRatio = inRatio;
+            updateMatrix();
+            setNeedsWrite();
+        }
+    }
+
+    void updateMatrix() {
+        ubo.view = glm::lookAt(ubo.viewerPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(aspectRatio), 0.1f, 10.0f);
+        // Correct orientation.
+        ubo.proj[1][1] *= -1;
+    }
+
+public:
+    void setNeedsWrite() {
+        for (int i = 0; i < needsBufferWrite.size(); ++i) {
+            needsBufferWrite[i] = true;
+        }
     }
 
     void createDescriptorSetLayout(VkDevice device) {
@@ -109,12 +145,7 @@ public:
         return needsBufferWrite[currentImage];
     }
 
-    void updateUniformBuffer(uint32_t currentImage, float aspectRatio) {
-        ubo.view = glm::lookAt(DEFAULT_VIEWER_POS, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
-        // Correct orientation.
-        ubo.proj[1][1] *= -1;
-
+    void updateUniformBuffer(uint32_t currentImage) {
         memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
         needsBufferWrite[currentImage] = false;
     }

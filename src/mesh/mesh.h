@@ -5,19 +5,22 @@
 #include "uniforms.h"
 #include "vulkan_objects.h"
 
+#include <array>
+#include <cassert>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <glm/trigonometric.hpp>
+#include <numbers>
+#include <vector>
+
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
-
-#include <array>
-#include <cassert>
-#include <chrono>
-#include <cstdint>
-#include <cstring>
-#include <vector>
 
 struct Vertex {
     glm::vec3 pos;
@@ -68,6 +71,85 @@ struct Vertex {
     }
 };
 
+class MeshController {
+    static constexpr glm::vec3 DEFAULT_MESH_POSITION = {-0.5f, -0.25f, -0.5f};
+    static constexpr double ROT_RADS_PER_SEC         = std::numbers::pi / 8.0;
+    static constexpr double USER_ROT_SPEED           = 0.0125;
+
+    ModelUniform ubo{};
+
+    bool rotationPaused = true;
+    // TODO: To use this it would have to be per image as in SceneInfo.
+    bool needsUniformWrite = true;
+
+    using time_point          = decltype(std::chrono::high_resolution_clock::now());
+    time_point lastUpdateTime = std::chrono::high_resolution_clock::now();
+
+public:
+    double xRotRad = 0.0;
+    double yRotRad = 0.0;
+
+public:
+    MeshController() = default;
+
+    ModelUniform &getUbo() {
+        return ubo;
+    }
+
+    void setPauseRotation(bool pause) {
+        if (rotationPaused && !pause) {
+            lastUpdateTime = std::chrono::high_resolution_clock::now();
+        }
+        rotationPaused = pause;
+    }
+
+    void updateFromAppState(const AppState &appState) {
+        ubo.metallic  = appState.metallic;
+        ubo.roughness = appState.roughness;
+    }
+
+    void updateColor(glm::vec3 color) {
+        ubo.meshColor = color;
+    }
+
+    void restartRotation() {
+        lastUpdateTime = std::chrono::high_resolution_clock::now();
+    }
+
+    void syncRotation(double inYRotRad) {
+        yRotRad = inYRotRad;
+    }
+
+    void updateMatrix() {
+        // Update model matrix.
+        ubo.model = glm::rotate(glm::mat4(1.0f), static_cast<float>(yRotRad), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::rotate(ubo.model, static_cast<float>(-xRotRad), glm::vec3(1.0f, 0.0f, 0.0f));
+        ubo.model = glm::translate(ubo.model, DEFAULT_MESH_POSITION);
+    }
+
+    void applyUserRotation(const std::pair<double, double> userRot) {
+        if (userRot.first == 0.0 && userRot.second == 0.0) {
+            return;
+        }
+        yRotRad = yRotRad + userRot.first * USER_ROT_SPEED;
+        xRotRad = xRotRad + userRot.second * USER_ROT_SPEED;
+        updateMatrix();
+    }
+
+    void applyTimedRotation() {
+        if (rotationPaused) {
+            return;
+        }
+
+        // Increment rotation angle proportional to time change.
+        time_point currentTime = std::chrono::high_resolution_clock::now();
+        double time = std::chrono::duration<double, std::chrono::seconds::period>(currentTime - lastUpdateTime).count();
+        yRotRad     = yRotRad + time * ROT_RADS_PER_SEC;
+        lastUpdateTime = currentTime;
+        updateMatrix();
+    }
+};
+
 struct IndexedMesh {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -78,21 +160,12 @@ struct IndexedMesh {
     VkDeviceMemory indexBufferMemory;
     uint32_t numIndices;
 
-    static constexpr float ROT_RADS_PER_SEC          = 22.5f;
-    static constexpr glm::vec3 DEFAULT_MESH_POSITION = {-0.5f, -0.25f, -0.5f};
-
     UniformInfo uniformInfo;
-    ModelUniform ubo{};
-
-    // TODO: To use this it would have to be per image as in SceneInfo.
-    bool needsUniformWrite = true;
+    MeshController controller;
 
     VkDescriptorPool descriptorPool;
     DescriptorSetLayout descriptorSetLayout;
     std::vector<VkDescriptorSet> descriptorSets;
-
-    using time_point     = decltype(std::chrono::high_resolution_clock::now());
-    time_point startTime = std::chrono::high_resolution_clock::now();
 
 public:
     IndexedMesh() = default;
@@ -100,9 +173,15 @@ public:
     IndexedMesh(std::vector<Vertex> &&inVertices, std::vector<uint32_t> &&inIndices)
         : vertices{std::forward<std::vector<Vertex>>(inVertices)},
           indices{std::forward<std::vector<uint32_t>>(inIndices)} {
-        applyTimedRotation();
+        controller.updateMatrix();
     }
 
+    glm::vec3 &getVertColor() {
+        assert(!vertices.empty());
+        return vertices[0].color;
+    }
+
+public:
     void createDescriptorSetLayout(VkDevice device) {
         descriptorSetLayout.init(device);
     }
@@ -156,32 +235,11 @@ public:
     }
 
     bool needsUniformBufferWrite() {
-        return true; // needsUniformWrite;
-    }
-
-    void updateFromAppState(const AppState &appState) {
-        ubo.metallic      = appState.metallic;
-        ubo.roughness     = appState.roughness;
-        needsUniformWrite = true;
-    }
-
-    void updateColor(glm::vec3 color) {
-        ubo.meshColor     = color;
-        needsUniformWrite = true;
-    }
-
-    void applyTimedRotation() {
-        time_point currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<double, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        // Update model matrix.
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(ROT_RADS_PER_SEC), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.model = glm::translate(ubo.model, DEFAULT_MESH_POSITION);
-        needsUniformWrite = true;
+        return true;
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
-        memcpy(uniformInfo.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+        memcpy(uniformInfo.uniformBuffersMapped[currentImage], &controller.getUbo(), sizeof(ModelUniform));
     }
 
     void destroyBuffers(VkDevice device) {

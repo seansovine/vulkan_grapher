@@ -39,12 +39,11 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action, i
 Application::Application() {
     initWindow();
     initVulkan();
-    initUI();
 
     // Setup event handling.
-    windowEvents.initGlfw(window);
-    // glfwSetMouseButtonCallback(window, WindowEvents::mouseButtonCallback);
-    // glfwSetCursorPosCallback(window, WindowEvents::mousePositionCallback);
+    windowEvents.init(window, &appState);
+    // Needs done after our glfw callbacks are set.
+    initUI();
 }
 
 Application::~Application() {

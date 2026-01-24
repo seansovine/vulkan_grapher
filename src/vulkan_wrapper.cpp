@@ -171,7 +171,7 @@ void GlfwVulkanWrapper::deinit() {
 
 // Rendering functions.
 
-void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResized) {
+void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -185,23 +185,32 @@ void GlfwVulkanWrapper::drawFrame(const AppState &appState, bool frameBufferResi
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    float aspectRatio = swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height;
+    double aspectRatio = swapChainInfo.swapChainExtent.width / (double)swapChainInfo.swapChainExtent.height;
+    sceneUniform.applyUserZoom(appState.takeUserScroll());
+    sceneUniform.setApsectRatio(aspectRatio);
     if (sceneUniform.needsUniformBufferWrite(currentFrame)) {
-        sceneUniform.updateUniformBuffer(currentFrame, aspectRatio);
+        sceneUniform.updateUniformBuffer(currentFrame);
     }
 
-    graphMesh->applyTimedRotation();
-    graphMesh->updateFromAppState(appState);
-    graphMesh->updateColor(appState.graphColor);
-    if (graphMesh.has_value() && graphMesh->needsUniformBufferWrite()) {
-        graphMesh->updateUniformBuffer(currentFrame);
+    if (graphMesh.has_value()) {
+        MeshController &controller = graphMesh->controller;
+        controller.setPauseRotation(appState.mouseInteracting || !appState.rotating);
+        controller.applyUserRotation(appState.takeUserRotation());
+        controller.applyTimedRotation();
+        controller.updateFromAppState(appState);
+        controller.updateColor(appState.graphColor);
+        if (graphMesh->needsUniformBufferWrite()) {
+            graphMesh->updateUniformBuffer(currentFrame);
+        }
     }
 
-    // floorMesh->applyTimedRotation();
-    floorMesh->updateFromAppState(appState);
-    floorMesh->updateColor(floorMesh->vertices[0].color);
-    if (floorMesh.has_value() && floorMesh->needsUniformBufferWrite()) {
-        floorMesh->updateUniformBuffer(currentFrame);
+    if (floorMesh.has_value()) {
+        MeshController &controller = floorMesh->controller;
+        controller.syncRotation(floorMesh.has_value() ? floorMesh->controller.yRotRad : 0.0);
+        controller.updateColor(floorMesh->getVertColor());
+        if (floorMesh->needsUniformBufferWrite()) {
+            floorMesh->updateUniformBuffer(currentFrame);
+        }
     }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);

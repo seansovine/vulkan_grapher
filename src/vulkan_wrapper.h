@@ -121,7 +121,7 @@ public:
     void deinit();
 
     // Rendering functions.
-    void drawFrame(const AppState &appState, bool frameBufferResized);
+    void drawFrame(AppState &appState, bool frameBufferResized);
     void recordCommandBuffer(const AppState &appState, VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 public:
