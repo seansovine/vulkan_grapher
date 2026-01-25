@@ -3,6 +3,7 @@
 
 #include "vulkan_objects.h"
 
+#include <cstddef>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
@@ -81,7 +82,7 @@ public:
 
 public:
     void setNeedsWrite() {
-        for (int i = 0; i < needsBufferWrite.size(); ++i) {
+        for (size_t i = 0; i < needsBufferWrite.size(); ++i) {
             needsBufferWrite[i] = true;
         }
     }

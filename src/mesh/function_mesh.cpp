@@ -115,7 +115,7 @@ void FunctionMesh::buildFloorMesh() {
     }
 }
 
-double FunctionMesh::secondDerivEst(const Square &square, const SquareFuncEval &funcVals) {
+double FunctionMesh::secondDerivEst(const Square &square) {
     float center[2]      = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]),
                             0.5f * (square.mTopLeft[1] + square.mBtmRight[1])};
     float topMiddle[2]   = {0.5f * (square.mTopLeft[0] + square.mBtmRight[0]), square.mTopLeft[1]};
@@ -170,7 +170,7 @@ bool FunctionMesh::shouldRefine(Square &square) {
     minF = std::min(minF, funcVals.centerVal);
 
     double valueRange     = maxF - minF;
-    double secondDerivMag = secondDerivEst(square, funcVals);
+    double secondDerivMag = secondDerivEst(square);
 
     bool shouldRefine = valueRange > REFINEMENT_THRESHOLD_VARIATION || secondDerivMag > REFINEMENT_THRESHOLD_2ND_DERIV;
 
@@ -583,7 +583,7 @@ void FunctionMesh::computeVerticesAndIndices() {
         if (shouldRefine(square)) {
             refine(square);
         }
-        auto &_ = square.populateRefinements();
+        [[maybe_unused]] auto &_ = square.populateRefinements();
     }
 
     // Update edge refinements from neighbors to make mesh water tight.

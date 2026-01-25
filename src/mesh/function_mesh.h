@@ -45,22 +45,22 @@ struct Square {
 
     // Child squares if this has been refined.
     // Order is: top-left, top-right, bottom-left, bottom-right.
-    std::vector<Square> children;
+    std::vector<Square> children = {};
 
     // Indices of triangles for this square.
-    std::vector<uint32_t> triangleIndices;
+    std::vector<uint32_t> triangleIndices = {};
 
     bool hasChildren() const {
         return !children.empty();
     }
 
     struct EdgeRefinements {
-        std::vector<uint32_t> north;
-        std::vector<uint32_t> west;
-        std::vector<uint32_t> south;
-        std::vector<uint32_t> east;
+        std::vector<uint32_t> north = {};
+        std::vector<uint32_t> west  = {};
+        std::vector<uint32_t> south = {};
+        std::vector<uint32_t> east  = {};
     };
-    EdgeRefinements edgeRefinements;
+    EdgeRefinements edgeRefinements = {};
 
     const EdgeRefinements &populateRefinements();
 };
@@ -71,8 +71,8 @@ struct Triangle {
     uint32_t vert3Idx = UINT32_MAX;
 
     // Normal vector in world coordinates.
-    glm::vec3 normal;
-    double area;
+    glm::vec3 normal = {};
+    double area      = 0.0;
 };
 
 // --------------------
@@ -339,7 +339,7 @@ private:
         return {mFloorMeshVertices[index].pos.x, mFloorMeshVertices[index].pos.z};
     }
 
-    double secondDerivEst(const Square &square, const SquareFuncEval &funcVals);
+    double secondDerivEst(const Square &square);
 
     // Precondition: Square vertex indices are valid for function mesh.
     bool shouldRefine(Square &square);

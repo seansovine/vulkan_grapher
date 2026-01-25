@@ -5,7 +5,7 @@
 #include <iostream>
 #include <stdexcept>
 
-int main(int argc, char *argv[]) {
+int main() {
     mathpresso::Context ctx;
     mathpresso::Expression exp;
 

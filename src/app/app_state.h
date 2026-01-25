@@ -119,7 +119,7 @@ public:
         return static_cast<WindowEvents *>(glfwGetWindowUserPointer(window));
     }
 
-    static void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+    static void mouseButtonCallback(GLFWwindow *window, int button, int action, [[maybe_unused]] int mods) {
         WindowEvents *thisPtr = getThisPtr(window);
         if (thisPtr->imGuiWantsMouse) {
             return;
@@ -150,7 +150,7 @@ public:
         }
     }
 
-    static void mouseScrollCallback(GLFWwindow *window, double _dx, double dy) {
+    static void mouseScrollCallback(GLFWwindow *window, [[maybe_unused]] double dx, double dy) {
         WindowEvents *thisPtr = getThisPtr(window);
         if (thisPtr->imGuiWantsMouse) {
             return;
@@ -158,7 +158,8 @@ public:
         thisPtr->applyScrollChange(dy);
     }
 
-    static void keyboardCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    static void keyboardCallback(GLFWwindow *window, int key, [[maybe_unused]] int scancode, int action,
+                                 [[maybe_unused]] int mods) {
         if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }

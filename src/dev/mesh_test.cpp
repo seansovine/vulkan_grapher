@@ -5,9 +5,9 @@
 #include <limits>
 #include <string>
 
-static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
-    return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5);
-};
+[[maybe_unused]]
+static auto TEST_FUNCTION_PARABOLIC =
+    [](double x, double y) -> double { return 1.0 - (x - 0.5) * (x - 0.5) - (y - 0.5) * (y - 0.5); };
 
 static auto sinc = [](double x, double y) -> double {
     double scale = 50; // 100

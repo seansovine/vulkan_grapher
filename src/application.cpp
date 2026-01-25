@@ -16,7 +16,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -24,7 +23,7 @@
 
 // GLFW callbacks.
 
-void framebufferResizeCallback(GLFWwindow *window, int width, int height) {
+void framebufferResizeCallback(GLFWwindow *window, [[maybe_unused]] int width, [[maybe_unused]] int height) {
     auto app                = static_cast<Application *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
 }

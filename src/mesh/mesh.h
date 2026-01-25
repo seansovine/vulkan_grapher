@@ -26,9 +26,9 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
 
-    glm::vec3 tangent;
-    glm::vec3 bitangent;
-    glm::vec3 normal;
+    glm::vec3 tangent   = {};
+    glm::vec3 bitangent = {};
+    glm::vec3 normal    = {};
 
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -82,7 +82,7 @@ class MeshController {
 
     bool rotationPaused = true;
     // TODO: To use this it would have to be per image as in SceneInfo.
-    bool needsUniformWrite = true;
+    [[maybe_unused]] bool needsUniformWrite = true;
 
     using time_point          = decltype(std::chrono::high_resolution_clock::now());
     time_point lastUpdateTime = std::chrono::high_resolution_clock::now();

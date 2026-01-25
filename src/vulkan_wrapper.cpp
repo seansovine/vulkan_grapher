@@ -18,7 +18,6 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
-#include <iostream>
 
 // State management functions.
 
@@ -90,7 +89,8 @@ void GlfwVulkanWrapper::updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMes
     // should take longer than copying it to the device.
 }
 
-void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData, const std::string &id) {
+void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData,
+                                                  [[maybe_unused]] const std::string &id) {
     if (graphMesh.has_value()) {
         updateMesh(newMeshData[0], graphMesh.value());
     } else {
@@ -711,8 +711,9 @@ void GlfwVulkanWrapper::createLogicalDevice() {
     }
 
     VkPhysicalDeviceFeatures2 features = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = nullptr,
+        .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext    = nullptr,
+        .features = {},
     };
     vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
 
@@ -1236,7 +1237,7 @@ void GlfwVulkanWrapper::recordCommandBuffer(const AppState &appState, VkCommandB
     renderPassInfo.renderArea.extent = swapChainInfo.swapChainExtent;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color        = {0.0f, 0.0f, 0.0f, 1.0f};
+    clearValues[0].color        = {{0.0f, 0.0f, 0.0f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
