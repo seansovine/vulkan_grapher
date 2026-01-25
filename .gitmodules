@@ -7,3 +7,6 @@
 [submodule "thirdparty/asmjit"]
 	path = thirdparty/asmjit
 	url = git@github.com:asmjit/asmjit.git
+[submodule "thirdparty/spdlog"]
+	path = thirdparty/spdlog
+	url = git@github.com:gabime/spdlog.git

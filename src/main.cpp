@@ -2,7 +2,11 @@
 
 #include <iostream>
 
+#include <spdlog/common.h>
+#include <spdlog/spdlog.h>
+
 int main() {
+    spdlog::set_level(spdlog::level::trace);
     Application app;
 
     try {

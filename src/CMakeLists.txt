@@ -25,6 +25,7 @@ target_link_libraries(renderer-app
 	Vulkan::Vulkan
 	imgui-renderer
 	glm::glm
+	spdlog::spdlog
 	app
 	mesh
 )
