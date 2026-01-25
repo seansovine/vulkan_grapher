@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <glm/fwd.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cstdint>
@@ -89,7 +90,7 @@ class FunctionMesh {
     static constexpr bool DEBUG_REFINEMENT = false;
 
     // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int mNumCells = 400;
+    static constexpr int NUM_CELLS = 400;
 
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.
@@ -305,6 +306,7 @@ private:
     void addFloorMeshVertex(float x, float z);
 
     void setFuncVertTBNs();
+    void setFuncVertTBNsDirect();
 
     double funcMeshY(uint32_t index) {
         return mFunctionMeshVertices[index].pos.y;
@@ -405,11 +407,11 @@ private:
 
     // Ensure we don't overlow our index type: This check is
     // necessary, but not sufficient, because of mesh refinement.
-    static_assert(static_cast<uint64_t>(mNumCells) * static_cast<uint64_t>(mNumCells) <
+    static_assert(static_cast<uint64_t>(NUM_CELLS) * static_cast<uint64_t>(NUM_CELLS) <
                   static_cast<uint64_t>(UINT32_MAX));
 
     // = 1.0 / mNumCells.
-    static constexpr double mCellWidth = 1.0 / mNumCells;
+    static constexpr double mCellWidth = 1.0 / NUM_CELLS;
 
     // Squares that make up x,y-plane mesh.
     std::vector<Square> mFloorMeshSquares = {};

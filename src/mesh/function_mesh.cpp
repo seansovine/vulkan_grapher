@@ -78,11 +78,11 @@ const Square::EdgeRefinements &Square::populateRefinements() {
 // FunctionMesh implementations.
 
 void FunctionMesh::buildFloorMesh() {
-    mFloorMeshSquares.reserve(mNumCells * mNumCells);
-    const double width = 1.0 / mNumCells;
+    mFloorMeshSquares.reserve(NUM_CELLS * NUM_CELLS);
+    const double width = 1.0 / NUM_CELLS;
 
-    for (int i = 1; i <= mNumCells; i++) {
-        for (int j = 1; j <= mNumCells; j++) {
+    for (int i = 1; i <= NUM_CELLS; i++) {
+        for (int j = 1; j <= NUM_CELLS; j++) {
             // clang-format off
             Square square{
                 .mTopLeft ={
@@ -107,7 +107,7 @@ void FunctionMesh::buildFloorMesh() {
                 westNeighbor.eastNeighbor = &newSquare;
             }
             if (i >= 2) {
-                Square &northNeighbor       = mFloorMeshSquares.at((i - 2) * mNumCells + (j - 1));
+                Square &northNeighbor       = mFloorMeshSquares.at((i - 2) * NUM_CELLS + (j - 1));
                 newSquare.northNeighbor     = &northNeighbor;
                 northNeighbor.southNeighbor = &newSquare;
             }
@@ -486,10 +486,53 @@ void FunctionMesh::setFuncVertTBNs() {
     }
 }
 
+void FunctionMesh::setFuncVertTBNsDirect() {
+    spdlog::trace("Setting vertex TBN vectors using direct method...");
+    // Increment for derivative estimates.
+    constexpr double H = 1.0 / (NUM_CELLS * 10e1);
+
+    for (Vertex &vert : mFunctionMeshVertices) {
+        // Convert to double precision for computation.
+        double x = vert.pos.x;
+        double z = vert.pos.z;
+
+        double dydx = (mFunc(x + H, z) - mFunc(x - H, z)) / (2.0 * H);
+        double dydz = (mFunc(x, z + H) - mFunc(x, z - H)) / (2.0 * H);
+
+        glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
+        glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
+        glm::dvec3 normal = glm::cross(tz, tx);
+        // TODO: Evidence suggests we're losing a lot of precision here.
+        //       We should re-write numerically stable versions by hand.
+
+        // Hopefully we can achieve this tolerance.
+        constexpr float ORTHO_ERROR_TOLERANCE = 1e-5;
+        double txDotN                         = glm::dot(tx, normal);
+        double tzDotN                         = glm::dot(tz, normal);
+        if (std::abs(txDotN) > ORTHO_ERROR_TOLERANCE || std::abs(tzDotN) > ORTHO_ERROR_TOLERANCE) {
+            spdlog::warn("Vertex TBN vectors failed orthogonality check.");
+        }
+
+#ifndef NDEBUG
+        double normalLen = glm::length(normal);
+        if (std::abs(normalLen - 1.0) > 1e-2) {
+            spdlog::warn("Error in length of computed normal exceeds threshold.");
+        }
+        // This warning IS firing, so we are losing significant precision.
+#else
+        normal = glm::normalize(normal);
+#endif
+
+        vert.tangent   = glm::vec3(tx);
+        vert.bitangent = glm::vec3(tz);
+        vert.normal    = glm::vec3(normal);
+    }
+}
+
 // New method. Once complete will replace old methods.
 void FunctionMesh::computeVerticesAndIndices() {
     mFloorMeshVertices.clear();
-    mFloorMeshVertices.reserve((mNumCells + 1) * (mNumCells + 1) + mNumCells * mNumCells);
+    mFloorMeshVertices.reserve((NUM_CELLS + 1) * (NUM_CELLS + 1) + NUM_CELLS * NUM_CELLS);
 
     for (auto &square : mFloorMeshSquares) {
         float centerX = 0.5 * (square.mTopLeft[0] + square.mBtmRight[0]);
@@ -565,7 +608,7 @@ void FunctionMesh::computeVerticesAndIndices() {
         addTriIndices(tri);
     }
 
-    setFuncVertTBNs();
+    setFuncVertTBNsDirect();
 }
 
 static std::vector<uint32_t> *getNorthNbRefinements(Square *square) {
