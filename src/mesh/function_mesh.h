@@ -108,7 +108,7 @@ public:
         auto stop = std::chrono::high_resolution_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-        std::cout << "Mesh generation time: " << duration.count() << " ms." << std::endl;
+        spdlog::debug("Mesh generation time: {} ms.", duration.count());
     }
 
     void generateMesh() {

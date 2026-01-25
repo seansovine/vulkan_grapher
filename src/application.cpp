@@ -9,6 +9,7 @@
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cassert>
@@ -41,7 +42,7 @@ Application::Application() {
 }
 
 Application::~Application() {
-    std::cout << "Cleaning up..." << std::endl;
+    spdlog::trace("Cleaning up...");
 
     // Cleanup DearImGui.
     ImGui_ImplVulkan_Shutdown();
@@ -55,7 +56,7 @@ Application::~Application() {
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    std::cout << "Done." << std::endl;
+    spdlog::info("Done.");
 }
 
 // Initialization methods.
@@ -118,15 +119,15 @@ bool Application::populateFunctionMeshes() {
 
     auto populate = [this](double (*func)(double, double)) {
         FunctionMesh mesh{func};
-        std::cout << " - # function mesh vertices: " << std::to_string(mesh.functionVertices().size()) << std::endl;
-        std::cout << " - # function mesh indices:  " << std::to_string(mesh.meshIndices().size()) << std::endl;
+        spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
+        spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
 
         auto floorMesh = FunctionMesh::simpleFloorMesh();
         meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
     };
 
-    std::cout << "Building function meshes." << std::endl;
+    spdlog::debug("Building function meshes.");
 
     switch (appState.testFunc) {
     case TestFunc::Parabolic: {
@@ -142,7 +143,7 @@ bool Application::populateFunctionMeshes() {
         break;
     }
     case TestFunc::UserInput: {
-        std::cerr << "User-defined function not yet implemented." << std::endl;
+        spdlog::error("User-defined function not yet implemented.");
         return false;
     }
     default: {

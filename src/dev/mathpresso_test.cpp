@@ -1,5 +1,6 @@
 #include <mathpresso/mathpresso.h>
 
+#include <cmath>
 #include <format>
 #include <iostream>
 #include <stdexcept>
@@ -30,7 +31,7 @@ int main(int argc, char *argv[]) {
     result  = exp.evaluate(data);
 
     // Convert NaNs to zero.
-    result = (result == result) ? result : 0.0;
+    result = std::isnan(result) ? result : 0.0;
 
     std::cout << std::format("f(0.0,  0.0) = {:.4}\n", result);
 

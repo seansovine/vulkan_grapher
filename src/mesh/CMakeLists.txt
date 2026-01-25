@@ -3,5 +3,5 @@ file(GLOB SOURCES "*.cpp")
 
 add_library(mesh ${HEADERS} ${SOURCES})
 set_target_properties(mesh PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(mesh PUBLIC vulkan-util app)
+target_link_libraries(mesh PUBLIC vulkan-util app spdlog::spdlog)
 target_include_directories(mesh PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -2,6 +2,7 @@
 #include "app_state.h"
 
 #include <GLFW/glfw3.h>
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
@@ -295,7 +296,7 @@ std::vector<const char *> GlfwVulkanWrapper::getRequiredExtensions() const {
 
     std::vector<const char *> extensions(glfwRequiredExtensions, glfwRequiredExtensions + glfwExtensionCount);
     for (const char *extension : extensions) {
-        std::cout << extension << std::endl;
+        spdlog::info("Using Vulkan extension: {}", extension);
     }
 
     if (debugInfo.enableValidationLayers) {
@@ -660,7 +661,7 @@ void GlfwVulkanWrapper::pickPhysicalDevice() {
         if (isDeviceSuitable(device)) {
             VkPhysicalDeviceProperties properties;
             vkGetPhysicalDeviceProperties(device, &properties);
-            std::cout << "Using discrete GPU: " << properties.deviceName << std::endl;
+            spdlog::info("Using discrete GPU: {}", properties.deviceName);
             physicalDevice = device;
             msaaSamples    = getMaxUsableSampleCount();
             break;
