@@ -490,7 +490,10 @@ void FunctionMesh::setFuncVertTBNs() {
 void FunctionMesh::setFuncVertTBNsDirect() {
     spdlog::trace("Setting vertex TBN vectors using direct method...");
     // Increment for derivative estimates.
-    constexpr double H = 1.0 / (4 * NUM_CELLS);
+    constexpr double H = 1.0 / (2 * NUM_CELLS);
+
+    // TODO: Evidence suggests we're missing a lot of precision here.
+    //       We'll try to track down the source.
 
     for (Vertex &vert : mFunctionMeshVertices) {
         // Convert to double precision for computation.
@@ -509,8 +512,6 @@ void FunctionMesh::setFuncVertTBNsDirect() {
         glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
         glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
         glm::dvec3 normal = glm::cross(tz, tx);
-        // TODO: Evidence suggests we're losing a lot of precision here.
-        //       We should re-write numerically stable versions by hand.
 
         // Hopefully we can achieve this tolerance.
         constexpr float ORTHO_ERROR_TOLERANCE = 1e-5;
@@ -518,26 +519,6 @@ void FunctionMesh::setFuncVertTBNsDirect() {
         double tzDotN                         = glm::dot(tz, normal);
         if (std::abs(txDotN) > ORTHO_ERROR_TOLERANCE || std::abs(tzDotN) > ORTHO_ERROR_TOLERANCE) {
             spdlog::warn("Vertex TBN vectors failed orthogonality check.");
-        }
-
-        constexpr bool CHECK_NORMAL_PRECISION = true;
-
-        if constexpr (CHECK_NORMAL_PRECISION) {
-            double normalLen = glm::length(normal);
-            if (std::abs(normalLen - 1.0) > 1e-2) {
-                spdlog::warn("Error in length of computed normal exceeds threshold.");
-                // This warning IS firing, so we are losing significant precision.
-
-                static auto debugGlmVec = [](glm::dvec3 vec) {
-                    return std::format("({:.6f}, {:.6f}, {:.6f})", vec.x, vec.y, vec.z); //
-                };
-
-                spdlog::debug("Computed length is: {}", normalLen);
-                spdlog::debug(" - (x, z): ({}, {})", x, z);
-                spdlog::debug(" -     tx: {}", debugGlmVec(tx));
-                spdlog::debug(" -     tz: {}", debugGlmVec(tz));
-                spdlog::debug(" - normal: {}", debugGlmVec(normal));
-            }
         }
 
         vert.tangent   = glm::vec3(tx);
