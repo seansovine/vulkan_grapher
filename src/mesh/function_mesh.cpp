@@ -1,6 +1,7 @@
 #include "function_mesh.h"
 
 #include "mesh.h"
+#include "spdlog/spdlog.h"
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
@@ -489,7 +490,7 @@ void FunctionMesh::setFuncVertTBNs() {
 void FunctionMesh::setFuncVertTBNsDirect() {
     spdlog::trace("Setting vertex TBN vectors using direct method...");
     // Increment for derivative estimates.
-    constexpr double H = 1.0 / (NUM_CELLS * 10e1);
+    constexpr double H = 1.0 / (4 * NUM_CELLS);
 
     for (Vertex &vert : mFunctionMeshVertices) {
         // Convert to double precision for computation.
@@ -498,6 +499,12 @@ void FunctionMesh::setFuncVertTBNsDirect() {
 
         double dydx = (mFunc(x + H, z) - mFunc(x - H, z)) / (2.0 * H);
         double dydz = (mFunc(x, z + H) - mFunc(x, z - H)) / (2.0 * H);
+
+        [[maybe_unused]]
+        static auto normalize = [](const glm::dvec3 &vec) {
+            double norm = std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+            return glm::dvec3(vec.x / norm, vec.y / norm, vec.z / norm);
+        };
 
         glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
         glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
@@ -513,19 +520,29 @@ void FunctionMesh::setFuncVertTBNsDirect() {
             spdlog::warn("Vertex TBN vectors failed orthogonality check.");
         }
 
-#ifndef NDEBUG
-        double normalLen = glm::length(normal);
-        if (std::abs(normalLen - 1.0) > 1e-2) {
-            spdlog::warn("Error in length of computed normal exceeds threshold.");
+        constexpr bool CHECK_NORMAL_PRECISION = true;
+
+        if constexpr (CHECK_NORMAL_PRECISION) {
+            double normalLen = glm::length(normal);
+            if (std::abs(normalLen - 1.0) > 1e-2) {
+                spdlog::warn("Error in length of computed normal exceeds threshold.");
+                // This warning IS firing, so we are losing significant precision.
+
+                static auto debugGlmVec = [](glm::dvec3 vec) {
+                    return std::format("({:.6f}, {:.6f}, {:.6f})", vec.x, vec.y, vec.z); //
+                };
+
+                spdlog::debug("Computed length is: {}", normalLen);
+                spdlog::debug(" - (x, z): ({}, {})", x, z);
+                spdlog::debug(" -     tx: {}", debugGlmVec(tx));
+                spdlog::debug(" -     tz: {}", debugGlmVec(tz));
+                spdlog::debug(" - normal: {}", debugGlmVec(normal));
+            }
         }
-        // This warning IS firing, so we are losing significant precision.
-#else
-        normal = glm::normalize(normal);
-#endif
 
         vert.tangent   = glm::vec3(tx);
         vert.bitangent = glm::vec3(tz);
-        vert.normal    = glm::vec3(normal);
+        vert.normal    = glm::vec3(glm::normalize(normal));
     }
 }
 
@@ -608,7 +625,11 @@ void FunctionMesh::computeVerticesAndIndices() {
         addTriIndices(tri);
     }
 
-    setFuncVertTBNsDirect();
+    if constexpr (DIRECT_NORMALS) {
+        setFuncVertTBNsDirect();
+    } else {
+        setFuncVertTBNs();
+    }
 }
 
 static std::vector<uint32_t> *getNorthNbRefinements(Square *square) {
