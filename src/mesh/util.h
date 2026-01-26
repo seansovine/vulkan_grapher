@@ -47,4 +47,19 @@ static std::string debugGlmVec(glm::dvec3 vec) {
     return std::format("({}, {}, {})", vec.x, vec.y, vec.z);
 };
 
+class LogisticCutoff {
+    const double center;
+    const double width;
+
+public:
+    constexpr LogisticCutoff(double center, double width)
+        : center{center},
+          width{width} {
+    }
+
+    double operator()(double t) const {
+        return 1.0 / (1.0 + std::exp(-2 * width * (t - center)));
+    }
+};
+
 #endif // MESH_UTIL_H_

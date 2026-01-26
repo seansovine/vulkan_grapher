@@ -2,6 +2,7 @@
 #define FUNCTION_MESH_H_
 
 #include "mesh.h"
+#include "util.h"
 
 #include <cstddef>
 #include <glm/fwd.hpp>
@@ -88,7 +89,7 @@ class FunctionMesh {
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool SHOW_REFINEMENT  = true;
     static constexpr bool DEBUG_REFINEMENT = false;
-    static constexpr bool DIRECT_NORMALS   = true;
+    static constexpr bool DIRECT_NORMALS   = false;
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int NUM_CELLS = 400;
@@ -99,6 +100,15 @@ class FunctionMesh {
 
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
+
+    // Increment for derivative estimates.
+    static constexpr double H = 10e-6;
+
+    // For interpolating between normal computation methods.
+    static constexpr double SECOND_DERIV_CUTOFF       = 30.0;
+    static constexpr double SECOND_DERIV_CUTOFF_WIDTH = 20.0;
+
+    const LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
 public:
     explicit FunctionMesh(const F func)
@@ -308,6 +318,7 @@ private:
 
     void setFuncVertTBNs();
     void setFuncVertTBNsDirect();
+    glm::dvec3 normalAtPoint(const glm::vec3 &pos);
 
     double funcMeshY(uint32_t index) {
         return mFunctionMeshVertices[index].pos.y;
@@ -341,6 +352,7 @@ private:
     }
 
     double secondDerivEst(const Square &square);
+    double secondDerivEstMax(const glm::vec3 &pos);
 
     // Precondition: Square vertex indices are valid for function mesh.
     bool shouldRefine(Square &square);

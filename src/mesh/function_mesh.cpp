@@ -143,6 +143,21 @@ double FunctionMesh::secondDerivEst(const Square &square) {
     return std::sqrt(fxx * fxx + fyy * fyy + fxy * fxy) / 3.0;
 }
 
+double FunctionMesh::secondDerivEstMax(const glm::vec3 &pos) {
+    double x = pos.x;
+    double z = pos.z;
+
+    double fxx = (mFunc(x + H, z) - 2.0 * mFunc(x, z) + mFunc(x - H, z)) / (H * H);
+    double fzz = (mFunc(x, z + H) - 2.0 * mFunc(x, z) + mFunc(x, z - H)) / (H * H);
+
+    double fxz = (mFunc(x + H, z + H) - mFunc(x + H, z) - mFunc(x, z + H)    //
+                  + 2.0 * mFunc(x, z)                                        //
+                  - mFunc(x - H, z) - mFunc(x, z - H) + mFunc(x - H, z - H)) //
+                 / (2.0 * H * H);
+
+    return std::max({std::abs(fxx), std::abs(fzz), std::abs(fxz)});
+}
+
 // Precondition: Square vertex indices are valid for function mesh.
 bool FunctionMesh::shouldRefine(Square &square) {
     if constexpr (DEBUG_REFINEMENT) {
@@ -440,18 +455,28 @@ void FunctionMesh::setFuncVertTBNs() {
         }
         avgNormal = glm::normalize(avgNormal);
 
-        // TODO: Here we will use the second derivate estimate and
-        // deicde how much to interpolate this with the directly-
+        glm::dvec3 numNormal = normalAtPoint(funcVert.pos);
+        double secondDeriv   = secondDerivEstMax(funcVert.pos);
+        double t             = mSecondDerivCutoff(secondDeriv);
+        glm::dvec3 normal    = glm::normalize(t * numNormal + (1.0 - t) * avgNormal);
+
+        if constexpr (DEV_DEBUG) {
+            spdlog::trace("Vertex pos 2nd deriv est: {}", secondDeriv);
+            spdlog::trace("- t = : {}", t);
+        }
+
+        // Here we use the second derivate estimate to deicde
+        // how much to interpolate this with the directly-
         // computed numerical derivative. (See the note below.)
 
         // Use Gram-Schmidt to get ONB.
-        glm::dvec3 tangent = glm::normalize(xDir - glm::dot(xDir, avgNormal) * avgNormal);
+        glm::dvec3 tangent = glm::normalize(xDir - glm::dot(xDir, normal) * normal);
         glm::dvec3 bitangent =
-            glm::normalize(zDir - glm::dot(zDir, avgNormal) * avgNormal - glm::dot(zDir, tangent) * tangent);
+            glm::normalize(zDir - glm::dot(zDir, normal) * normal - glm::dot(zDir, tangent) * tangent);
 
         // Verify orientation and orthonormality.
         constexpr float TRIPLE_ERROR_TOLERANCE = 0.01f;
-        float scalarTriple                     = glm::dot(avgNormal, glm::cross(bitangent, tangent));
+        float scalarTriple                     = glm::dot(normal, glm::cross(bitangent, tangent));
         if (std::abs(scalarTriple - 1.0f) >= TRIPLE_ERROR_TOLERANCE) {
             std::cout << "TBN scalar triple product: " << std::to_string(scalarTriple) << std::endl;
         }
@@ -459,7 +484,7 @@ void FunctionMesh::setFuncVertTBNs() {
 
         funcVert.tangent   = glm::vec3(tangent);
         funcVert.bitangent = glm::vec3(bitangent);
-        funcVert.normal    = glm::vec3(avgNormal);
+        funcVert.normal    = glm::vec3(normal);
     }
 }
 
@@ -488,10 +513,30 @@ void FunctionMesh::setFuncVertTBNs() {
 // methods, with the old triangle-averaging method taking over more in
 // places where the gradient of the function is large.
 
+glm::dvec3 FunctionMesh::normalAtPoint(const glm::vec3 &pos) {
+    double x = pos.x;
+    double z = pos.z;
+
+    double dydx = (mFunc(x + H, z) - mFunc(x - H, z)) / (2.0 * H);
+    double dydz = (mFunc(x, z + H) - mFunc(x, z - H)) / (2.0 * H);
+
+    glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
+    glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
+    glm::dvec3 normal = glm::normalize(glm::dvec3(-dydx, 1.0, -dydz));
+
+    // Sanity check.
+    constexpr float ORTHO_ERROR_TOLERANCE = 1e-8;
+    double txDotN                         = glm::dot(tx, normal);
+    double tzDotN                         = glm::dot(tz, normal);
+    if (std::abs(txDotN) > ORTHO_ERROR_TOLERANCE || std::abs(tzDotN) > ORTHO_ERROR_TOLERANCE) {
+        spdlog::debug("Vertex TBN vectors failed orthogonality check.");
+    }
+
+    return normal;
+}
+
 void FunctionMesh::setFuncVertTBNsDirect() {
     spdlog::trace("Setting vertex TBN vectors using direct method...");
-    // Increment for derivative estimates.
-    constexpr double H = 10e-6;
 
     for (Vertex &vert : mFunctionMeshVertices) {
         // Convert to double precision for computation.
