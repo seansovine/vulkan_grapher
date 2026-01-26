@@ -88,7 +88,7 @@ class FunctionMesh {
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool SHOW_REFINEMENT  = true;
     static constexpr bool DEBUG_REFINEMENT = false;
-    static constexpr bool DIRECT_NORMALS   = false;
+    static constexpr bool DIRECT_NORMALS   = true;
 
     // Number of subdivisions of x,y axes when creating cells.
     static constexpr int NUM_CELLS = 400;

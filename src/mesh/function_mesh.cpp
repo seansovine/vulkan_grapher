@@ -1,10 +1,11 @@
 #include "function_mesh.h"
 
 #include "mesh.h"
-#include "spdlog/spdlog.h"
+#include "util.h"
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
@@ -14,7 +15,6 @@
 #include <iostream>
 #include <ostream>
 #include <string>
-#include <utility>
 #include <vector>
 
 // Square implementations.
@@ -412,34 +412,6 @@ void FunctionMesh::addTriIndices(const Triangle &tri) {
     mMeshIndices.push_back(tri.vert3Idx);
 }
 
-// Thanks to Henrique Bucher, who presented this numerically stable version of
-// Heron's formula derived by William Kahan on the Low Latency Insights substack.
-double triangleArea(double len1, double len2, double len3) {
-    // Sort lengths.
-    if (len2 > len1) {
-        std::swap(len2, len1);
-    }
-    if (len3 > len2) {
-        std::swap(len3, len2);
-    }
-    if (len2 > len1) {
-        std::swap(len2, len1);
-    }
-
-    // Degenerate case.
-    if (len1 >= len2 + len3) {
-        return 0.0;
-    }
-
-    // Heron's formula with ordered operations.
-    return 0.25 * std::sqrt(                   //
-                      (len1 + (len2 + len3)) * //
-                      (len3 - (len1 - len2)) * //
-                      (len3 + (len1 - len2)) * //
-                      (len1 + (len2 - len3))   //
-                  );
-}
-
 void FunctionMesh::setFuncVertTBNs() {
     // Assign normal and area to each triangle.
     for (Triangle &tri : mFunctionMeshTriangles) {
@@ -454,46 +426,72 @@ void FunctionMesh::setFuncVertTBNs() {
         tri.area    = triangleArea(len1, len2, len3);
     }
 
-    constexpr glm::vec3 xDir = {1.0f, 0.0f, 0.0f};
-    constexpr glm::vec3 zDir = {0.0f, 0.0f, 1.0f};
+    constexpr glm::dvec3 xDir = {1.0f, 0.0f, 0.0f};
+    constexpr glm::dvec3 zDir = {0.0f, 0.0f, 1.0f};
 
     // Now compute TBN basis for each vertex by averaging tri normals.
-    // TODO: Look into computing in double precision here.
     for (uint32_t i = 0; i < mFloorMeshVertices.size(); i++) {
         Vertex &funcVert = mFunctionMeshVertices[i];
 
-        glm::vec3 avgNormal = {0.0f, 0.0f, 0.0f};
+        glm::dvec3 avgNormal = {0.0f, 0.0f, 0.0f};
         for (uint32_t vertTriIdx : mVertexTriangles[i]) {
             const Triangle &vertTri = mFunctionMeshTriangles[vertTriIdx];
-            avgNormal += static_cast<float>(vertTri.area) * vertTri.normal;
+            avgNormal += vertTri.area * glm::dvec3(vertTri.normal);
         }
-        avgNormal       = glm::normalize(avgNormal);
-        funcVert.normal = avgNormal;
+        avgNormal = glm::normalize(avgNormal);
+
+        // TODO: Here we will use the second derivate estimate and
+        // deicde how much to interpolate this with the directly-
+        // computed numerical derivative. (See the note below.)
 
         // Use Gram-Schmidt to get ONB.
-        glm::vec3 tangent = glm::normalize(xDir - glm::dot(xDir, avgNormal) * avgNormal);
-        glm::vec3 bitangent =
+        glm::dvec3 tangent = glm::normalize(xDir - glm::dot(xDir, avgNormal) * avgNormal);
+        glm::dvec3 bitangent =
             glm::normalize(zDir - glm::dot(zDir, avgNormal) * avgNormal - glm::dot(zDir, tangent) * tangent);
-        funcVert.tangent   = tangent;
-        funcVert.bitangent = bitangent;
 
         // Verify orientation and orthonormality.
         constexpr float TRIPLE_ERROR_TOLERANCE = 0.01f;
-        float scalarTriple                     = glm::dot(avgNormal, glm::cross(funcVert.bitangent, funcVert.tangent));
+        float scalarTriple                     = glm::dot(avgNormal, glm::cross(bitangent, tangent));
         if (std::abs(scalarTriple - 1.0f) >= TRIPLE_ERROR_TOLERANCE) {
             std::cout << "TBN scalar triple product: " << std::to_string(scalarTriple) << std::endl;
         }
         assert(std::abs(scalarTriple - 1.0f) < TRIPLE_ERROR_TOLERANCE);
+
+        funcVert.tangent   = glm::vec3(tangent);
+        funcVert.bitangent = glm::vec3(bitangent);
+        funcVert.normal    = glm::vec3(avgNormal);
     }
 }
+
+// NOTE:
+//
+// There is a visual artifact where there are bright spots on steep
+// parts of the surface that are parallel to the x- or z-axis. I thought
+// this was due to a numerical issue, but now I'm not so sure. It may be
+// related to the shape of our mesh grid. Or it could be related to the
+// precision of the grid point coordinates; we should try using doubles
+// for them to see if that helps.
+//
+// Looking at how our grid gets stretched on steep, rounded parts of the
+// graph, it looks like this artifact is likeley due to a cmobination of
+// fragment interpolation and the shape of the mesh.
+//
+// If we could construct a mesh suited to each function being graphed,
+// that would produce much better results. It's difficult to make one
+// fixed grid work for arbitrary functions.
+//
+// The old method of averaging triangle normals doesn't have this bright
+// spot problem, but it produces much worse-looking results in places
+// where the function is changing on a small scale.
+//
+// The best solution might be to use a weighted average of the two
+// methods, with the old triangle-averaging method taking over more in
+// places where the gradient of the function is large.
 
 void FunctionMesh::setFuncVertTBNsDirect() {
     spdlog::trace("Setting vertex TBN vectors using direct method...");
     // Increment for derivative estimates.
-    constexpr double H = 1.0 / (2 * NUM_CELLS);
-
-    // TODO: Evidence suggests we're missing a lot of precision here.
-    //       We'll try to track down the source.
+    constexpr double H = 10e-6;
 
     for (Vertex &vert : mFunctionMeshVertices) {
         // Convert to double precision for computation.
@@ -503,27 +501,21 @@ void FunctionMesh::setFuncVertTBNsDirect() {
         double dydx = (mFunc(x + H, z) - mFunc(x - H, z)) / (2.0 * H);
         double dydz = (mFunc(x, z + H) - mFunc(x, z - H)) / (2.0 * H);
 
-        [[maybe_unused]]
-        static auto normalize = [](const glm::dvec3 &vec) {
-            double norm = std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-            return glm::dvec3(vec.x / norm, vec.y / norm, vec.z / norm);
-        };
-
         glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
         glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
-        glm::dvec3 normal = glm::cross(tz, tx);
+        glm::dvec3 normal = glm::normalize(glm::dvec3(-dydx, 1.0, -dydz));
 
-        // Hopefully we can achieve this tolerance.
-        constexpr float ORTHO_ERROR_TOLERANCE = 1e-5;
+        // Sanity check.
+        constexpr float ORTHO_ERROR_TOLERANCE = 1e-8;
         double txDotN                         = glm::dot(tx, normal);
         double tzDotN                         = glm::dot(tz, normal);
         if (std::abs(txDotN) > ORTHO_ERROR_TOLERANCE || std::abs(tzDotN) > ORTHO_ERROR_TOLERANCE) {
-            spdlog::warn("Vertex TBN vectors failed orthogonality check.");
+            spdlog::debug("Vertex TBN vectors failed orthogonality check.");
         }
 
         vert.tangent   = glm::vec3(tx);
         vert.bitangent = glm::vec3(tz);
-        vert.normal    = glm::vec3(glm::normalize(normal));
+        vert.normal    = glm::vec3(normal);
     }
 }
 
