@@ -61,7 +61,7 @@ public:
     }
 
     double operator()(double t) const {
-        return 1.0 / (1.0 + std::exp(-2 * width * (t - center)));
+        return 1.0 / (1.0 + std::exp(-12.0 * (t - center) / width));
     }
 };
 

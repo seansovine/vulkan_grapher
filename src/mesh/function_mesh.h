@@ -105,8 +105,8 @@ class FunctionMesh {
     static constexpr double H = 10e-6;
 
     // For interpolating between normal computation methods.
-    static constexpr double SECOND_DERIV_CUTOFF       = 30.0;
-    static constexpr double SECOND_DERIV_CUTOFF_WIDTH = 20.0;
+    static constexpr double SECOND_DERIV_CUTOFF       = 40.0;
+    static constexpr double SECOND_DERIV_CUTOFF_WIDTH = 10.0;
 
     const LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
