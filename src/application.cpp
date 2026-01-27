@@ -10,6 +10,7 @@
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
 #include <spdlog/spdlog.h>
+#include <vk_video/vulkan_video_codec_h265std.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cassert>
@@ -26,6 +27,8 @@
 void framebufferResizeCallback(GLFWwindow *window, [[maybe_unused]] int width, [[maybe_unused]] int height) {
     auto app                = static_cast<Application *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
+    app->currentWidth       = static_cast<uint32_t>(width);
+    app->currentHeight      = static_cast<uint32_t>(height);
 }
 
 // Class methods.
@@ -186,6 +189,10 @@ void Application::drawUI() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    static constexpr ImVec2 WINDOW_SIZE = {380.0f, 360.0f};
+    ImGui::SetNextWindowSize(WINDOW_SIZE, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+
     ImGui::Begin("Settings");
     ImGui::Text("Average framerate: %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
@@ -231,5 +238,25 @@ void Application::drawUI() {
     ImGui::SliderFloat("Roughness", &appState.roughness, 0.0f, 1.0f, "%.2f");
 
     ImGui::End();
+
+    if (appState.testFunc == TestFunc::UserInput) {
+        drawFunctionInput();
+    }
+
     ImGui::Render();
+}
+
+void Application::drawFunctionInput() {
+    static constexpr ImVec2 WINDOW_SIZE = {400.0f, 110.0f};
+    ImGui::SetNextWindowSize(WINDOW_SIZE, ImGuiCond_FirstUseEver);
+    ImVec2 windowLocation = {10.0f, currentHeight - WINDOW_SIZE.y - 10};
+    ImGui::SetNextWindowPos(windowLocation, ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Function y = f(x, z).");
+
+    ImGui::Text("Enter f(x, z):");
+    ImGui::InputTextMultiline("", appState.functionInputBuffer.data(), appState.functionInputBuffer.size(),
+                              ImVec2(-1.0f, 50.0f));
+
+    ImGui::End();
 }

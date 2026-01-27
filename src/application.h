@@ -27,12 +27,17 @@ private:
     void initUI();
 
     void drawUI();
+    void drawFunctionInput();
+
     void drawFrame();
     bool populateFunctionMeshes();
 
 private:
-    const uint32_t INITIAL_WINDOW_WIDTH  = 1500;
-    const uint32_t INITIAL_WINDOW_HEIGHT = 900;
+    static constexpr uint32_t INITIAL_WINDOW_WIDTH  = 1500;
+    static constexpr uint32_t INITIAL_WINDOW_HEIGHT = 900;
+
+    uint32_t currentWidth  = INITIAL_WINDOW_WIDTH;
+    uint32_t currentHeight = INITIAL_WINDOW_HEIGHT;
 
     bool framebufferResized = false;
 

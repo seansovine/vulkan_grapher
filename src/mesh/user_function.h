@@ -25,6 +25,10 @@ class UserFunction {
 public:
     UserFunction() = default;
 
+    explicit UserFunction(double meshRadius)
+        : meshRadius{meshRadius} {
+    }
+
     UserFunction(const std::string &expression, double meshRadius = DEFAULT_MESH_RADIUS)
         : meshRadius{meshRadius} {
         assign(expression);
