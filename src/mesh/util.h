@@ -1,6 +1,8 @@
 #ifndef MESH_UTIL_H_
 #define MESH_UTIL_H_
 
+#include "user_function.h"
+
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -8,6 +10,8 @@
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
+
+namespace math_util {
 
 // Numerically stable Heron's formula found on Low Latency Trading Insights substack.
 [[maybe_unused]]
@@ -64,5 +68,37 @@ public:
         return 1.0 / (1.0 + std::exp(-12.0 * (t - center) / width));
     }
 };
+
+[[maybe_unused]]
+static auto TEST_FUNCTION_PARABOLIC(double x, double z) -> double {
+    return 0.75 - (x - 0.5) * (x - 0.5) - (z - 0.5) * (z - 0.5);
+};
+
+static auto sinc(double x, double z) -> double {
+    constexpr double scale = 30; // 100
+    double mag             = scale * std::sqrt(x * x + z * z);
+    return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
+};
+[[maybe_unused]]
+static auto TEST_FUNCTION_SHIFTED_SINC(double x, double z) -> double {
+    return 0.75 * sinc(x - 0.5, z - 0.5) + 0.25; //
+};
+
+static auto expSine(double x, double z) -> double {
+    return std::pow(std::numbers::e, -std::sin(x * x + z * z));
+};
+static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE = [](double x, double z) -> double {
+    constexpr double scale = 8.0;
+    return 0.125 * expSine(scale * (x - 0.5), scale * (z - 0.5));
+};
+
+static UserFunction TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER_ = {
+    "0.75 * sin(30.0 * sqrt(x * x + z * z)) / (30.0 * sqrt(x * x + z * z)) + 0.25"};
+
+static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER = [](double x, double z) -> double {
+    return TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER_(x, z);
+};
+
+} // namespace math_util
 
 #endif // MESH_UTIL_H_

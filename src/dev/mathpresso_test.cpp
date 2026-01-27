@@ -1,9 +1,11 @@
-#include <mathpresso/mathpresso.h>
+#include <user_function.h>
 
 #include <cmath>
 #include <format>
 #include <iostream>
 #include <stdexcept>
+
+#include <mathpresso/mathpresso.h>
 
 int main() {
     mathpresso::Context ctx;
@@ -32,8 +34,30 @@ int main() {
 
     // Convert NaNs to zero.
     result = std::isnan(result) ? result : 0.0;
-
     std::cout << std::format("f(0.0,  0.0) = {:.4}\n", result);
+
+    UserFunction userF1{};
+
+    // Failed assignment.
+    try {
+        userF1.assign("sin(sqrt(x * x + z * z)) / sqrt(x * x + z * z");
+    } catch (const BadExpression &error) {
+        std::cout << "Failed to parse expression." << std::endl;
+    }
+
+    UserFunction userF{};
+
+    try {
+        userF.assign("sin(sqrt(x * x + z * z)) / sqrt(x * x + z * z)");
+    } catch (const BadExpression &error) {
+        std::cout << "Failed to parse expression." << std::endl;
+    }
+
+    result = userF(0.5, -0.5);
+    std::cout << std::format("User f(0.5, -0.5) = {:.4}\n", result);
+
+    result = userF(0.0, 0.0);
+    std::cout << std::format("User f(0.0, 0.0) ~ {:.4}\n", result);
 
     return 0;
 }

@@ -12,15 +12,12 @@
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 
+using namespace math_util;
+
 /**
  * Our function is: 0.75 * sinc(30 * ||(x - 0.5, z - 0.5)||) + 0.25
  */
 
-static auto sinc = [](double x, double z) -> double {
-    constexpr double scale = 30; // 100
-    double mag             = scale * std::hypot(x, z);
-    return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
-};
 static auto mFunc = [](double x, double z) -> double {
     return 0.75 * sinc(x - 0.5, z - 0.5) + 0.25; //
 };

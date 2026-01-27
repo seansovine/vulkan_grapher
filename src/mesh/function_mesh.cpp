@@ -438,7 +438,7 @@ void FunctionMesh::setFuncVertTBNs() {
         double len1 = glm::length(vert1 - vert2);
         double len2 = glm::length(vert2 - vert3);
         double len3 = glm::length(vert3 - vert1);
-        tri.area    = triangleArea(len1, len2, len3);
+        tri.area    = math_util::triangleArea(len1, len2, len3);
     }
 
     constexpr glm::dvec3 xDir = {1.0f, 0.0f, 0.0f};

@@ -108,7 +108,7 @@ class FunctionMesh {
     static constexpr double SECOND_DERIV_CUTOFF       = 40.0;
     static constexpr double SECOND_DERIV_CUTOFF_WIDTH = 10.0;
 
-    const LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
+    const math_util::LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
 public:
     explicit FunctionMesh(const F func)
