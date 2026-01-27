@@ -465,9 +465,9 @@ void FunctionMesh::setFuncVertTBNs() {
             spdlog::trace("- t = : {}", t);
         }
 
-        // Here we use the second derivate estimate to deicde
-        // how much to interpolate this with the directly-
-        // computed numerical derivative. (See the note below.)
+        // Here we use the second derivate estimate to deicde how much
+        // to interpolate this averaged triangle normal with the directly-
+        // computed normal. (See the note below.)
 
         // Use Gram-Schmidt to get ONB.
         glm::dvec3 tangent = glm::normalize(xDir - glm::dot(xDir, normal) * normal);
@@ -491,27 +491,26 @@ void FunctionMesh::setFuncVertTBNs() {
 // NOTE:
 //
 // There is a visual artifact where there are bright spots on steep
-// parts of the surface that are parallel to the x- or z-axis. I thought
-// this was due to a numerical issue, but now I'm not so sure. It may be
-// related to the shape of our mesh grid. Or it could be related to the
-// precision of the grid point coordinates; we should try using doubles
-// for them to see if that helps.
+// parts of the surface that are parallel to the x- or z-axis when the
+// normal is computed directly from the numerical derivatives.
+// It seems to be due to a combination of the mesh grid shape, the
+// function shape, and numerical stability issues in our computations.
 //
-// Looking at how our grid gets stretched on steep, rounded parts of the
-// graph, it looks like this artifact is likeley due to a cmobination of
-// fragment interpolation and the shape of the mesh.
+// On the other hand, the method of averaging the triangle normals
+// above looks worse in parts of the graph where the curvature is high,
+// which may be due to averaging with normal computed from farther-away
+// vertices.
 //
-// If we could construct a mesh suited to each function being graphed,
-// that would produce much better results. It's difficult to make one
-// fixed grid work for arbitrary functions.
+// The setFuncVertTBNs function now tries to interpolate between each
+// version of the normals based on the magnitude of the second
+// derivative of the function as a measure of the surface curvature.
 //
-// The old method of averaging triangle normals doesn't have this bright
-// spot problem, but it produces much worse-looking results in places
-// where the function is changing on a small scale.
-//
-// The best solution might be to use a weighted average of the two
-// methods, with the old triangle-averaging method taking over more in
-// places where the gradient of the function is large.
+// Either way, there is a limit to how much accuracy we can get when the
+// features of the function are changing fast compared to the distance
+// between vertices, due to the effect of fragment interpolation. Another
+// idea is to compute the normals at a higher-resolution grid of points
+// and put them into a multidimensional texture that the fragment shader
+// can sample.
 
 glm::dvec3 FunctionMesh::normalAtPoint(const glm::vec3 &pos) {
     double x = pos.x;
@@ -520,19 +519,7 @@ glm::dvec3 FunctionMesh::normalAtPoint(const glm::vec3 &pos) {
     double dydx = (mFunc(x + H, z) - mFunc(x - H, z)) / (2.0 * H);
     double dydz = (mFunc(x, z + H) - mFunc(x, z - H)) / (2.0 * H);
 
-    glm::dvec3 tx     = glm::normalize(glm::dvec3(1.0, dydx, 0.0));
-    glm::dvec3 tz     = glm::normalize(glm::dvec3(0.0, dydz, 1.0));
-    glm::dvec3 normal = glm::normalize(glm::dvec3(-dydx, 1.0, -dydz));
-
-    // Sanity check.
-    constexpr float ORTHO_ERROR_TOLERANCE = 1e-8;
-    double txDotN                         = glm::dot(tx, normal);
-    double tzDotN                         = glm::dot(tz, normal);
-    if (std::abs(txDotN) > ORTHO_ERROR_TOLERANCE || std::abs(tzDotN) > ORTHO_ERROR_TOLERANCE) {
-        spdlog::debug("Vertex TBN vectors failed orthogonality check.");
-    }
-
-    return normal;
+    return glm::normalize(glm::dvec3(-dydx, 1.0, -dydz));
 }
 
 void FunctionMesh::setFuncVertTBNsDirect() {
