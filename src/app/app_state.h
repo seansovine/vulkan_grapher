@@ -50,6 +50,7 @@ struct AppState {
     // User function input.
     static constexpr size_t INPUT_BUFFER_LEN               = 1024;
     std::array<char, INPUT_BUFFER_LEN> functionInputBuffer = {0};
+    bool functionParseError                                = false;
 
     // Render preferences.
     bool rotating        = false;

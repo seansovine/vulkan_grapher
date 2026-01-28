@@ -80,7 +80,7 @@ void Application::initUI() {
 
     vulkan.setUIDeinitCallback( //
         [this](VkDevice logicalDevice) {
-            imGuiVulkan.deinit(logicalDevice); //
+            imGuiVulkan.deinit(logicalDevice);
         });
 
     vulkan.setUIDrawCallback( //
@@ -90,12 +90,12 @@ void Application::initUI() {
 
     vulkan.setCreateUIFrameBuffersCallback( //
         [this](GlfwVulkanWrapper &inVulkan) {
-            this->imGuiVulkan.createFrameBuffers(inVulkan); //
+            this->imGuiVulkan.createFrameBuffers(inVulkan);
         });
 
     vulkan.setDestroyUIFrameBuffersCallback( //
         [this](GlfwVulkanWrapper &inVulkan) {
-            this->imGuiVulkan.destroyFrameBuffers(inVulkan); //
+            this->imGuiVulkan.destroyFrameBuffers(inVulkan);
         });
 }
 
@@ -201,17 +201,16 @@ void Application::run() {
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed) {
-        spdlog::debug("User pressed enter when in user func mode.");
         userFunction = std::make_unique<UserFunction>();
         try {
             userFunction->assign(appState.functionInputBuffer.data());
         } catch (const BadExpression &error) {
-            std::cout << "Failed to parse expression." << std::endl;
-            userFunction = nullptr;
+            userFunction                = nullptr;
+            appState.functionParseError = true;
         }
+        // TODO: This should really be done on a background thread.
         if (userFunction != nullptr && populateFunctionMeshes()) {
-            // TODO: This should really be done on a background thread.
-            spdlog::debug("Updating mesh from user function");
+            appState.functionParseError = false;
             vulkan.updateGraphAndFloorMeshes(meshesToRender, userFunction->userExpression());
         }
     }
@@ -296,7 +295,11 @@ void Application::drawFunctionInput() {
     ImGui::Text("Enter f(x, z):");
     ImGui::InputTextMultiline("", appState.functionInputBuffer.data(), //
                               appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f));
-    ImGui::Text("Press enter to apply");
+    if (!appState.functionParseError) {
+        ImGui::Text("Press enter to apply.");
+    } else {
+        ImGui::Text("Expression is invalid, please update.");
+    }
 
     ImGui::End();
 }
