@@ -19,6 +19,17 @@ _Graph of radial sinc function._
 | `control + click + drag` | translate graph   |
 | `mouse wheel`            | zoom graph        |
 
+## User function input
+
+There is now the option for the user to enter a function expression:
+
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/user_sine_product.png" alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
+This input will be parsed and evaluated with the [mathspresso](https://github.com/kobalicek/mathpresso) library
+and used to generate a graph.
+
 ## Mesh refinement
 
 The basic mesh generated for a graph looks much rougher in parts where the function --
@@ -49,15 +60,31 @@ material model. The PBR shading implementation closely follows the examples from
 [learnopengl.com](https://learnopengl.com/). The GUI has sliders to adjust the surface color
 and PBR metallic and roughness properties.
 
+## Build instructions
+
+There is a CMake build system, but you can use the Makefile as a convenience.
+
+```bash
+# Apologies if you need more; need to test from a clean env.
+sudo apt install libvulkan-dev libglfw3-dev glslang-tools
+
+make configure
+make build
+
+# Compile the shaders.
+make shaderc
+
+# Run built application in build/src/renderer-app.
+make run
+```
+
 ## To do next
 
-Next we will add these graphing features:
+Some more things I'd like to work on:
 
-1. Integrate a mathematical expression parsing library.
+1. Keep looking at ways to improve the mesh quality for round surfaces.
 
-2. Keep looking at ways to improve the mesh quality for round surfaces.
-
-3. Look into ways to improve the renderer efficiency.
+2. Look into ways to improve the renderer efficiency.
 
 ## Sources and credits
 
