@@ -5,6 +5,7 @@ AccessModifierOffset: -4
 AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: None
 AllowShortEnumsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
 
 BreakBeforeBraces: Custom
 BraceWrapping:

@@ -3,6 +3,7 @@
 #include "app_state.h"
 #include "function_mesh.h"
 #include "mesh.h"
+#include "user_function.h"
 #include "util.h"
 #include "vulkan_wrapper.h"
 
@@ -101,7 +102,7 @@ void Application::initUI() {
 bool Application::populateFunctionMeshes() {
     using namespace math_util;
 
-    auto populate = [this](double (*func)(double, double)) {
+    auto populateFromPtr = [this](double (*func)(double, double)) {
         FunctionMesh mesh{func};
         spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
         spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
@@ -115,20 +116,34 @@ bool Application::populateFunctionMeshes() {
 
     switch (appState.testFunc) {
     case TestFunc::Parabolic: {
-        populate(TEST_FUNCTION_PARABOLIC);
+        populateFromPtr(TEST_FUNCTION_PARABOLIC);
         break;
     }
     case TestFunc::ShiftedSinc: {
-        populate(TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
+        populateFromPtr(TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
         break;
     }
     case TestFunc::ExpSine: {
-        populate(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
+        populateFromPtr(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
         break;
     }
     case TestFunc::UserInput: {
-        spdlog::error("User-defined function not yet implemented.");
-        return false;
+        if (userFunction == nullptr) {
+            return false;
+        }
+        auto wrapper = [func = std::move(userFunction)](double x, double z) -> double {
+            return (*func)(x, z);
+        };
+        FunctionMesh mesh{std::move(wrapper)};
+        spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
+        spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
+
+        auto floorMesh = FunctionMesh::simpleFloorMesh();
+        meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                          IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+        // Should have been reset by move; but to make sure.
+        userFunction = nullptr;
+        break;
     }
     default: {
         throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
@@ -168,8 +183,11 @@ void Application::run() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         drawUI();
+
         ImGuiIO &io = ImGui::GetIO();
-        windowEvents.setGuiWantsInputs(io.WantCaptureMouse);
+        windowEvents.setGuiWantsInputs(io.WantCaptureMouse, io.WantCaptureKeyboard);
+        handleUserInput();
+
         drawFrame();
 
         // Limit frame computation rate, as we target 60 FPS.
@@ -178,6 +196,25 @@ void Application::run() {
     }
 
     vulkan.waitForDeviceIdle();
+}
+
+void Application::handleUserInput() {
+    UserGuiInput userInput = appState.takerUserGuiInput();
+    if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed) {
+        spdlog::debug("User pressed enter when in user func mode.");
+        userFunction = std::make_unique<UserFunction>();
+        try {
+            userFunction->assign(appState.functionInputBuffer.data());
+        } catch (const BadExpression &error) {
+            std::cout << "Failed to parse expression." << std::endl;
+            userFunction = nullptr;
+        }
+        if (userFunction != nullptr && populateFunctionMeshes()) {
+            // TODO: This should really be done on a background thread.
+            spdlog::debug("Updating mesh from user function");
+            vulkan.updateGraphAndFloorMeshes(meshesToRender, userFunction->userExpression());
+        }
+    }
 }
 
 void Application::drawFrame() {
@@ -249,16 +286,17 @@ void Application::drawUI() {
 }
 
 void Application::drawFunctionInput() {
-    static constexpr ImVec2 WINDOW_SIZE = {400.0f, 110.0f};
-    ImGui::SetNextWindowSize(WINDOW_SIZE, ImGuiCond_FirstUseEver);
+    static constexpr ImVec2 WINDOW_SIZE = {400.0f, 130.0f};
+    ImGui::SetNextWindowSize(WINDOW_SIZE, ImGuiCond_Appearing);
     ImVec2 windowLocation = {10.0f, currentHeight - WINDOW_SIZE.y - 10};
-    ImGui::SetNextWindowPos(windowLocation, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(windowLocation, ImGuiCond_Appearing);
 
     ImGui::Begin("Function y = f(x, z).");
 
     ImGui::Text("Enter f(x, z):");
-    ImGui::InputTextMultiline("", appState.functionInputBuffer.data(), appState.functionInputBuffer.size(),
-                              ImVec2(-1.0f, 50.0f));
+    ImGui::InputTextMultiline("", appState.functionInputBuffer.data(), //
+                              appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f));
+    ImGui::Text("Press enter to apply");
 
     ImGui::End();
 }

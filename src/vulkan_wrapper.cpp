@@ -184,7 +184,7 @@ void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
         throw std::runtime_error("Unable to acquire swap chain!");
     }
 
-    UserInput userInput = appState.takeUserInput();
+    UserGraphInput userInput = appState.takeUserGraphInput();
 
     double aspectRatio = swapChainInfo.swapChainExtent.width / (double)swapChainInfo.swapChainExtent.height;
     sceneUniform.applyUserZoom(userInput.userScroll);

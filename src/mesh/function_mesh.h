@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <set>
@@ -83,8 +84,9 @@ struct Triangle {
 // There is some redundancy among the vertices that we
 // will eliminate using indexing in a future version.
 
+using FuncXZ = double(double, double);
+
 class FunctionMesh {
-    using F = double (*)(double, double);
 
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool SHOW_REFINEMENT  = true;
@@ -111,9 +113,12 @@ class FunctionMesh {
     const math_util::LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
 public:
-    explicit FunctionMesh(const F func)
-        : mFunc(func) {
+    FunctionMesh(std::function<FuncXZ> &&func)
+        : mFunc(std::forward<std::function<FuncXZ>>(func)) {
+        init();
+    }
 
+    void init() {
         auto start = std::chrono::high_resolution_clock::now();
         generateMesh();
         auto stop = std::chrono::high_resolution_clock::now();
@@ -410,7 +415,8 @@ private:
 
 private:
     // The function z = mF(x, y) that we will graph.
-    F mFunc;
+    std::function<FuncXZ> mFunc = nullptr;
+    // Tried to keep the abstraction low, but std::function is just too convenient.
 
     // Default RGB colors for floor and function meshes.
     static constexpr glm::vec3 FLOOR_COLOR         = {0.556f, 0.367f, 0.076f};

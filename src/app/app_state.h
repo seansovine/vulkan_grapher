@@ -5,10 +5,14 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 #include <GLFW/glfw3.h>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
+
+// -------------------------
+// Global application state.
 
 enum class TestFunc : uint8_t {
     Parabolic   = 0,
@@ -25,12 +29,18 @@ static constexpr std::array<const char *, static_cast<size_t>(TestFunc::NUM_FUNC
     "User input",  //
 };
 
-struct UserInput {
+// User input data that is handled in renderer.
+struct UserGraphInput {
     double xUserRot   = 0.0;
     double yUserRot   = 0.0;
     double userScroll = 0.0;
     double xUserTrans = 0.0;
     double yUserTrans = 0.0;
+};
+
+// User input that is handled in user interface.
+struct UserGuiInput {
+    bool enterPressed = false;
 };
 
 struct AppState {
@@ -54,8 +64,9 @@ struct AppState {
     float roughness      = 0.27;
 
     // User interaction state.
-    bool mouseInteracting = false;
-    UserInput userInput   = {};
+    bool mouseInteracting         = false;
+    UserGraphInput userGraphInput = {};
+    UserGuiInput userGuiInput     = {};
 
 public:
     void toggleTestFunc() {
@@ -63,16 +74,21 @@ public:
         testFunc         = static_cast<TestFunc>((static_cast<uint8_t>(testFunc) + 1) % numFuncs);
     }
 
-    UserInput takeUserInput() {
-        UserInput returnVal = userInput;
-        userInput           = {};
-        return returnVal;
+    UserGraphInput takeUserGraphInput() {
+        return std::exchange(userGraphInput, {});
+    }
+
+    UserGuiInput takerUserGuiInput() {
+        return std::exchange(userGuiInput, {});
     }
 
     size_t selectedFuncIndex() {
         return static_cast<size_t>(testFunc);
     }
 };
+
+// ---------------------
+// Window event handler.
 
 class WindowEvents {
     // Mouse events.
@@ -83,7 +99,8 @@ class WindowEvents {
     // Keyboard state.
     bool controlDown = false;
     // Let ImGui capture some events.
-    bool imGuiWantsMouse = false;
+    bool imGuiWantsMouse    = false;
+    bool imGuiWantsKeyboard = false;
 
     AppState *appState = nullptr;
 
@@ -97,25 +114,22 @@ public:
         glfwSetKeyCallback(window, WindowEvents::keyboardCallback);
     }
 
-    void setGuiWantsInputs(bool wantsMouse) {
-        imGuiWantsMouse = wantsMouse;
+    void setGuiWantsInputs(bool wantsMouse, bool wantsKeyboard) {
+        imGuiWantsMouse    = wantsMouse;
+        imGuiWantsKeyboard = wantsKeyboard;
     }
 
     void applyMousePositionChange(double dx, double dy) {
         // Clamp to work around apparent glfw bug causing large jumps.
         if (!controlDown) {
             constexpr double MAX_ALLOWED_ROTATION = 20.0;
-            appState->userInput.xUserRot          = std::clamp(dx, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
-            appState->userInput.yUserRot          = std::clamp(dy, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
+            appState->userGraphInput.xUserRot     = std::clamp(dx, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
+            appState->userGraphInput.yUserRot     = std::clamp(dy, -MAX_ALLOWED_ROTATION, MAX_ALLOWED_ROTATION);
         } else {
-            constexpr double MAX_ALLOWED_MOVE = 20.0;
-            appState->userInput.xUserTrans    = std::clamp(dx, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
-            appState->userInput.yUserTrans    = std::clamp(dy, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
+            constexpr double MAX_ALLOWED_MOVE   = 20.0;
+            appState->userGraphInput.xUserTrans = std::clamp(dx, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
+            appState->userGraphInput.yUserTrans = std::clamp(dy, -MAX_ALLOWED_MOVE, MAX_ALLOWED_MOVE);
         }
-    }
-
-    void applyScrollChange(double dy) {
-        appState->userInput.userScroll = dy;
     }
 
 public:
@@ -159,15 +173,22 @@ public:
         if (thisPtr->imGuiWantsMouse) {
             return;
         }
-        thisPtr->applyScrollChange(dy);
+        thisPtr->appState->userGraphInput.userScroll = dy;
     }
 
     static void keyboardCallback(GLFWwindow *window, int key, [[maybe_unused]] int scancode, int action,
                                  [[maybe_unused]] int mods) {
+        WindowEvents *thisPtr = getThisPtr(window);
+        // We always handle enter.
+        if (key == GLFW_KEY_ENTER && action == GLFW_PRESS) {
+            thisPtr->appState->userGuiInput.enterPressed = true;
+        }
+        if (thisPtr->imGuiWantsKeyboard) {
+            return;
+        }
         if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
-        WindowEvents *thisPtr = getThisPtr(window);
         if (action == GLFW_PRESS && key == 341) {
             thisPtr->controlDown = true;
         } else if (action == GLFW_RELEASE && key == 341) {

@@ -22,15 +22,26 @@ class UserFunction {
     static constexpr double DEFAULT_MESH_RADIUS = 10e-3;
     double meshRadius                           = DEFAULT_MESH_RADIUS;
 
+    std::string expression = "";
+
 public:
     UserFunction() = default;
+
+    UserFunction(const UserFunction &other) {
+        expression = other.expression;
+        meshRadius = other.meshRadius;
+        if (other.exp.is_compiled()) {
+            assign(expression);
+        }
+    }
 
     explicit UserFunction(double meshRadius)
         : meshRadius{meshRadius} {
     }
 
     UserFunction(const std::string &expression, double meshRadius = DEFAULT_MESH_RADIUS)
-        : meshRadius{meshRadius} {
+        : meshRadius{meshRadius},
+          expression{expression} {
         assign(expression);
     }
 
@@ -44,6 +55,10 @@ public:
         if (err != mathpresso::kErrorOk) {
             throw BadExpression();
         }
+    }
+
+    const std::string &userExpression() {
+        return expression;
     }
 
     double operator()(double x, double z) {

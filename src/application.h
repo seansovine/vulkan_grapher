@@ -1,12 +1,12 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #include "app_state.h"
 #include "imgui_vulkan_data.h"
+#include "user_function.h"
 #include "vulkan_wrapper.h"
+
+#include <GLFW/glfw3.h>
 
 #include <array>
 #include <cstdint>
@@ -28,6 +28,7 @@ private:
 
     void drawUI();
     void drawFunctionInput();
+    void handleUserInput();
 
     void drawFrame();
     bool populateFunctionMeshes();
@@ -45,6 +46,7 @@ private:
 
     AppState appState;
     std::array<IndexedMesh, 2> meshesToRender;
+    std::shared_ptr<UserFunction> userFunction = nullptr;
 
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
