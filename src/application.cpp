@@ -3,6 +3,7 @@
 #include "app_state.h"
 #include "function_mesh.h"
 #include "mesh.h"
+#include "util.h"
 #include "vulkan_wrapper.h"
 
 #include <GLFW/glfw3.h>
@@ -118,11 +119,11 @@ bool Application::populateFunctionMeshes() {
         break;
     }
     case TestFunc::ShiftedSinc: {
-        populate(TEST_FUNCTION_SHIFTED_SINC);
+        populate(TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
         break;
     }
     case TestFunc::ExpSine: {
-        populate(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER);
+        populate(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
         break;
     }
     case TestFunc::UserInput: {
@@ -217,6 +218,7 @@ void Application::drawUI() {
     if (ImGui::Combo("Choose function", &selectedItem, funcNames.data(), funcNames.size())) {
         appState.testFunc = static_cast<TestFunc>(selectedItem);
         if (populateFunctionMeshes()) {
+            // TODO: This should really be done on a background thread.
             vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[selectedItem]);
         }
     }

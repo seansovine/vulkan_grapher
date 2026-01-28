@@ -80,23 +80,24 @@ static auto sinc(double x, double z) -> double {
     return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
 };
 [[maybe_unused]]
-static auto TEST_FUNCTION_SHIFTED_SINC(double x, double z) -> double {
+static auto TEST_FUNCTION_SHIFTED_SCALED_SINC(double x, double z) -> double {
     return 0.75 * sinc(x - 0.5, z - 0.5) + 0.25; //
 };
 
 static auto expSine(double x, double z) -> double {
     return std::pow(std::numbers::e, -std::sin(x * x + z * z));
 };
-static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE = [](double x, double z) -> double {
+[[maybe_unused]]
+static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE(double x, double z) -> double {
     constexpr double scale = 8.0;
     return 0.125 * expSine(scale * (x - 0.5), scale * (z - 0.5));
 };
 
-static UserFunction TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER_ = {
+static UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
     "0.75 * sin(30.0 * sqrt(x * x + z * z)) / (30.0 * sqrt(x * x + z * z)) + 0.25"};
 
-static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER = [](double x, double z) -> double {
-    return TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE_USER_(x, z);
+static auto TEST_FUNCTION_SHIFTED_SCALED_SINC_USER = [](double x, double z) -> double {
+    return TEST_FUNCTION_SCALED_SINC_USER_(x - 0.5, z - 0.5);
 };
 
 } // namespace math_util
