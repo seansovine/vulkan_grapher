@@ -603,14 +603,14 @@ void FunctionMesh::computeVerticesAndIndices() {
     // Refine squares and populate initial edge refinements.
     for (auto &square : mFloorMeshSquares) {
         if (shouldRefine(square)) {
-            refine(square);
+            refine(square); // TODO: There is a memory problem here.
         }
         [[maybe_unused]] auto &_ = square.populateRefinements();
     }
 
     // Update edge refinements from neighbors to make mesh water tight.
     for (auto &square : mFloorMeshSquares) {
-        syncEdgeRefinements(square);
+        syncEdgeRefinements(square); // TODO: There is a memory problem here.
     }
 
     mMeshIndices.clear();
@@ -707,7 +707,7 @@ void FunctionMesh::syncRefmtsHoriz(std::vector<uint32_t> &to, std::vector<uint32
 }
 
 // Precondition: to and from are sorted by increasing z.
-void FunctionMesh::syncRefmtsVert(std::vector<uint32_t> &to, std::vector<uint32_t> &from) { // TODO: Update to vertical.
+void FunctionMesh::syncRefmtsVert(std::vector<uint32_t> &to, std::vector<uint32_t> &from) {
     assert(!to.empty());
 
     auto getZ = [this](size_t index) -> float {
