@@ -1,6 +1,6 @@
 # Vulkan Grapher
 
-A work in progress 3D function grapher built with C++ + Vulkan + Dear ImGui.
+A work-in-progress 3D function grapher built with C++ + Vulkan + Dear ImGui.
 
 We have previously written a version of the function grapher using C++ + OpenGL in [opengl_examples](https://github.com/seansovine/opengl_examples),
 and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](https://github.com/seansovine/wgpu_grapher).
@@ -88,8 +88,13 @@ Some more things I'd like to work on:
 
 ## Sources and credits
 
-We are following the tutorial at [vulkan-tutorial.com](https://vulkan-tutorial.com/) and studying
-up in the _Vulkan Programming Guide_ by Graham Sellars. The example at [vk-sandbox](https://github.com/tstullich/vk-sandbox)
-was helpful for figuring out the Dear ImGui integration. We are also looking at Sascha Willems'
-Vulkan-glTF-PBR model viewer for inspiration, which is available [here](https://github.com/SaschaWillems/Vulkan-glTF-PBR) on GitHub.
-The official Vulkan docs from Khronos are also pretty good.
+We have learned from the tutorial at [vulkan-tutorial.com](https://vulkan-tutorial.com/) and
+the official _Vulkan Programming Guide_ by Graham Sellars.
+The example at [vk-sandbox](https://github.com/tstullich/vk-sandbox)
+was helpful for figuring out the Dear ImGui integration. For mathematical expression parsing
+we use the [mathspresso](https://github.com/kobalicek/mathpresso) library, which is released
+under a permissive license. We have also looked at Sascha Willems'
+Vulkan-glTF-PBR model viewer for inspiration, which is available [here](https://github.com/SaschaWillems/Vulkan-glTF-PBR).
+And we have learned many graphics concepts from the excellent site [learnopengl.com](https://learnopengl.com/).
+
+This software is released under the MIT license.
