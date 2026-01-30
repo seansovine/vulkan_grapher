@@ -13,12 +13,17 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 // ------------------
 // Geometric helpers.
+
+struct Square;
+
+using SharedSquare = std::shared_ptr<Square>;
 
 struct Square {
     float mTopLeft[2];
@@ -29,13 +34,13 @@ struct Square {
 
     // Neighbors in same level of grid.
     // For sharing vertices via indices.
-    Square *northNeighbor = nullptr;
-    Square *southNeighbor = nullptr;
-    Square *westNeighbor  = nullptr;
-    Square *eastNeighbor  = nullptr;
+    SharedSquare northNeighbor = nullptr;
+    SharedSquare southNeighbor = nullptr;
+    SharedSquare westNeighbor  = nullptr;
+    SharedSquare eastNeighbor  = nullptr;
 
     // Parent square, if this is a refinement.
-    Square *parent = nullptr;
+    SharedSquare parent = nullptr;
 
     // Vertex indeices of corners.
     // UINT32_MAX means unassigned.
@@ -47,7 +52,7 @@ struct Square {
 
     // Child squares if this has been refined.
     // Order is: top-left, top-right, bottom-left, bottom-right.
-    std::vector<Square> children = {};
+    std::vector<SharedSquare> children = {};
 
     // Indices of triangles for this square.
     std::vector<uint32_t> triangleIndices = {};
@@ -129,6 +134,7 @@ public:
 
     void generateMesh() {
         buildFloorMesh();
+        spdlog::trace("Finished building floor mesh.");
 
         if constexpr (USE_NEW_MESH) {
             computeVerticesAndIndices();
@@ -139,7 +145,7 @@ public:
         }
     }
 
-    std::vector<Square> &tessellationSquare() {
+    std::vector<SharedSquare> &tessellationSquare() {
         return mFloorMeshSquares;
     }
 
@@ -254,8 +260,8 @@ public:
 
         if (recurse && square.hasChildren()) {
             debugStrm << indent << " + Children:" << std::endl;
-            for (const Square &child : square.children) {
-                debugStrm << debugSquareCell(child, square_i);
+            for (const SharedSquare &child : square.children) {
+                debugStrm << debugSquareCell(*child, square_i);
             }
         }
         debugRefinements(debugStrm, square) << std::endl;
@@ -267,8 +273,8 @@ public:
     std::string debugMesh() {
         std::stringstream debugStrm;
         uint32_t square_i = 0;
-        for (const Square &square : mFloorMeshSquares) {
-            debugStrm << debugSquareCell(square, square_i);
+        for (const SharedSquare &square : mFloorMeshSquares) {
+            debugStrm << debugSquareCell(*square, square_i);
         }
         return debugStrm.str();
     }
@@ -311,7 +317,7 @@ public:
 private:
     void computeVerticesAndIndices();
 
-    void syncEdgeRefinements(Square &square);
+    void syncEdgeRefinements(SharedSquare &square);
 
     void syncRefmtsHoriz(std::vector<uint32_t> &to, std::vector<uint32_t> &from);
 
@@ -362,9 +368,9 @@ private:
     // Precondition: Square vertex indices are valid for function mesh.
     bool shouldRefine(Square &square);
 
-    void refine(Square &square);
+    void refine(SharedSquare square);
 
-    void addSquareTris(const Square &square);
+    void addSquareTris(const SharedSquare &square);
 
     void addTriIndices(const Triangle &tri);
 
@@ -376,14 +382,14 @@ private:
 
         for (const auto &square : mFloorMeshSquares) {
             // First triangle.
-            vertices.push_back({glm::vec3{square.mTopLeft[0], 0.0, square.mTopLeft[1]}, FLOOR_COLOR});
-            vertices.push_back({glm::vec3{square.mTopLeft[0], 0.0, square.mBtmRight[1]}, FLOOR_COLOR});
-            vertices.push_back({glm::vec3{square.mBtmRight[0], 0.0, square.mTopLeft[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mTopLeft[0], 0.0, square->mTopLeft[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mTopLeft[0], 0.0, square->mBtmRight[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mBtmRight[0], 0.0, square->mTopLeft[1]}, FLOOR_COLOR});
 
             // Second triangle.
-            vertices.push_back({glm::vec3{square.mBtmRight[0], 0.0, square.mBtmRight[1]}, FLOOR_COLOR});
-            vertices.push_back({glm::vec3{square.mBtmRight[0], 0.0, square.mTopLeft[1]}, FLOOR_COLOR});
-            vertices.push_back({glm::vec3{square.mTopLeft[0], 0.0, square.mBtmRight[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mBtmRight[0], 0.0, square->mBtmRight[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mBtmRight[0], 0.0, square->mTopLeft[1]}, FLOOR_COLOR});
+            vertices.push_back({glm::vec3{square->mTopLeft[0], 0.0, square->mBtmRight[1]}, FLOOR_COLOR});
         }
 
         mFloorMeshVertices = std::move(vertices);
@@ -433,7 +439,7 @@ private:
     static constexpr double mCellWidth = 1.0 / NUM_CELLS;
 
     // Squares that make up x,y-plane mesh.
-    std::vector<Square> mFloorMeshSquares = {};
+    std::vector<SharedSquare> mFloorMeshSquares = {};
     // IMPORTANT: Pointers to these elements are stored in various places.
     //            So once assigned, it must never reallocate!
     //
