@@ -131,18 +131,14 @@ bool Application::populateFunctionMeshes() {
         if (userFunction == nullptr) {
             return false;
         }
-        auto wrapper = [func = std::move(userFunction)](double x, double z) -> double {
-            return (*func)(x, z);
-        };
-        FunctionMesh mesh{std::move(wrapper)};
+        FunctionMesh mesh{*userFunction};
         spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
         spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
 
         auto floorMesh = FunctionMesh::simpleFloorMesh();
         meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-        // Should have been reset by move; but to make sure.
-        userFunction = nullptr;
+        userFunction   = nullptr;
         break;
     }
     default: {
@@ -201,7 +197,7 @@ void Application::run() {
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed) {
-        userFunction = std::make_unique<UserFunction>();
+        userFunction = std::make_shared<UserFunction>();
         try {
             userFunction->assign(appState.functionInputBuffer.data());
         } catch (const BadExpression &error) {
@@ -293,7 +289,7 @@ void Application::drawFunctionInput() {
     ImGui::Begin("Function y = f(x, z).");
 
     ImGui::Text("Enter f(x, z):");
-    ImGui::InputTextMultiline("", appState.functionInputBuffer.data(), //
+    ImGui::InputTextMultiline("user-func", appState.functionInputBuffer.data(), //
                               appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f));
     if (!appState.functionParseError) {
         ImGui::Text("Press enter to apply.");

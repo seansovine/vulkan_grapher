@@ -27,6 +27,7 @@ class UserFunction {
 public:
     UserFunction() = default;
 
+    // This constructor exists because exp is non-copyable.
     UserFunction(const UserFunction &other) {
         expression = other.expression;
         meshRadius = other.meshRadius;
@@ -45,16 +46,17 @@ public:
         assign(expression);
     }
 
-    void assign(const std::string &expression) {
+    void assign(const std::string &inExpression) {
         ctx.add_builtins();
         ctx.add_variable("x", 0 * sizeof(double));
         ctx.add_variable("z", 1 * sizeof(double));
 
-        mathpresso::Error err = exp.compile(ctx, expression.c_str(), mathpresso::kNoOptions);
+        mathpresso::Error err = exp.compile(ctx, inExpression.c_str(), mathpresso::kNoOptions);
 
         if (err != mathpresso::kErrorOk) {
             throw BadExpression();
         }
+        expression = inExpression;
     }
 
     const std::string &userExpression() {

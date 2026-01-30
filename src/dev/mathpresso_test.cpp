@@ -59,5 +59,13 @@ int main() {
     result = userF(0.0, 0.0);
     std::cout << std::format("User f(0.0, 0.0) ~ {:.4}\n", result);
 
+    UserFunction copy{userF};
+
+    result = copy(0.5, -0.5);
+    std::cout << std::format("Copy user f(0.5, -0.5) = {:.4}\n", result);
+
+    result = copy(0.0, 0.0);
+    std::cout << std::format("Copy user f(0.0, 0.0) ~ {:.4}\n", result);
+
     return 0;
 }
