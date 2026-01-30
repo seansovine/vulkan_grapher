@@ -99,11 +99,11 @@ class FunctionMesh {
     static constexpr bool DIRECT_NORMALS   = false;
 
     // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int NUM_CELLS = 400;
+    static constexpr int NUM_CELLS = 200;
 
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.
-    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 1;
+    static constexpr uint8_t MAX_REFINEMENT_DEPTH = 2;
 
     static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
     static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
@@ -422,7 +422,7 @@ private:
 private:
     // The function z = mF(x, y) that we will graph.
     std::function<FuncXZ> mFunc = nullptr;
-    // Tried to keep the abstraction low, but std::function is just too convenient.
+    // Used to hold callable user function object or standard function pointer.
 
     // Default RGB colors for floor and function meshes.
     static constexpr glm::vec3 FLOOR_COLOR         = {0.556f, 0.367f, 0.076f};
@@ -440,11 +440,6 @@ private:
 
     // Squares that make up x,y-plane mesh.
     std::vector<SharedSquare> mFloorMeshSquares = {};
-    // IMPORTANT: Pointers to these elements are stored in various places.
-    //            So once assigned, it must never reallocate!
-    //
-    // This means the top-level grid shape is fixed, and that grid squares
-    // are the owners of their child squares added during refinement.
 
     // Vertices of triangular tessellation built from squares.
     std::vector<Vertex> mFloorMeshVertices = {};

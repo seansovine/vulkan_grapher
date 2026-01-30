@@ -779,16 +779,14 @@ void FunctionMesh::syncEdgeRefinements(SharedSquare &square) {
     if (eastNb != nullptr) {
         auto &eastNbRefs = eastNb->edgeRefinements.west;
         if (eastNbRefs.size() > 2) {
-            syncRefmtsHoriz(square->edgeRefinements.east, eastNbRefs);
+            syncRefmtsVert(square->edgeRefinements.east, eastNbRefs);
         }
     }
     SharedSquare westNb = getWestNeighbor(square);
     if (westNb != nullptr) {
         auto &westNbRefs = westNb->edgeRefinements.east;
         if (westNbRefs.size() > 2) {
-            syncRefmtsHoriz(square->edgeRefinements.west, westNbRefs);
+            syncRefmtsVert(square->edgeRefinements.west, westNbRefs);
         }
     }
-
-    // TODO: We might need another pass back down the tree after this.
 }
