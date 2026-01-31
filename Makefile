@@ -29,3 +29,6 @@ shaderc: shaders/*.frag shaders/*.vert
 
 valgrind:
 	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/debug/src/renderer-app
+
+valgrind-release:
+	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/release/src/renderer-app

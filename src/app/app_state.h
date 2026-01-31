@@ -94,8 +94,8 @@ public:
 class WindowEvents {
     // Mouse events.
     bool leftMouseDown = false;
-    double lastMouseX;
-    double lastMouseY;
+    double lastMouseX  = 0.0;
+    double lastMouseY  = 0.0;
 
     // Keyboard state.
     bool controlDown = false;
