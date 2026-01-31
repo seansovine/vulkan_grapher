@@ -653,44 +653,44 @@ void FunctionMesh::computeVerticesAndIndices() {
 
 static SharedSquare getNorthNeighbor(SharedSquare &square) {
     SharedSquare *localSquare = &square;
-    while (localSquare != nullptr) {
+    while (localSquare != nullptr && *localSquare != nullptr) {
         if ((*localSquare)->northNeighbor != nullptr) {
-            return square->northNeighbor;
+            return (*localSquare)->northNeighbor;
         } else {
-            localSquare = &square->parent;
+            localSquare = &(*localSquare)->parent;
         }
     }
     return nullptr;
 }
 static SharedSquare getSouthNeighbor(SharedSquare &square) {
     SharedSquare *localSquare = &square;
-    while (localSquare != nullptr) {
+    while (localSquare != nullptr && *localSquare != nullptr) {
         if ((*localSquare)->southNeighbor != nullptr) {
-            return square->southNeighbor;
+            return (*localSquare)->southNeighbor;
         } else {
-            localSquare = &square->parent;
+            localSquare = &(*localSquare)->parent;
         }
     }
     return nullptr;
 }
 static SharedSquare getEastNeighbor(SharedSquare &square) {
     SharedSquare *localSquare = &square;
-    while (localSquare != nullptr) {
+    while (localSquare != nullptr && *localSquare != nullptr) {
         if ((*localSquare)->eastNeighbor != nullptr) {
-            return square->eastNeighbor;
+            return (*localSquare)->eastNeighbor;
         } else {
-            localSquare = &square->parent;
+            localSquare = &(*localSquare)->parent;
         }
     }
     return nullptr;
 }
 static SharedSquare getWestNeighbor(SharedSquare &square) {
     SharedSquare *localSquare = &square;
-    while (localSquare != nullptr) {
+    while (localSquare != nullptr && *localSquare != nullptr) {
         if ((*localSquare)->westNeighbor != nullptr) {
-            return square->westNeighbor;
+            return (*localSquare)->westNeighbor;
         } else {
-            localSquare = &square->parent;
+            localSquare = &(*localSquare)->parent;
         }
     }
     return nullptr;
