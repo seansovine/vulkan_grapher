@@ -99,7 +99,7 @@ public:
     void initMesh(IndexedMesh &mesh);
 
     // This moves out of meshData members and takes ownership of data.
-    void updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &meshData, const std::string &id);
+    void updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &meshData);
     void updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMesh);
 
     void setUIDeinitCallback(const std::function<DeinitUICallback> &inUiDeinitCallback) {

@@ -79,18 +79,21 @@ void GlfwVulkanWrapper::updateMesh(IndexedMesh &newMesh, IndexedMesh &currentMes
     currentMesh.vertices = std::move(newMesh.vertices);
     currentMesh.indices  = std::move(newMesh.indices);
 
+    auto start = std::chrono::high_resolution_clock::now();
     createVertexBuffer(currentMesh.vertices, currentMesh.vertexBuffer, currentMesh.vertexBufferMemory);
     assert(currentMesh.vertexBuffer != VK_NULL_HANDLE);
     createIndexBuffer(currentMesh.indices, currentMesh.indexBuffer, currentMesh.indexBufferMemory);
     assert(currentMesh.indexBuffer != VK_NULL_HANDLE);
+    auto stop     = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    spdlog::debug("Buffer copy time: {} ms", duration.count());
 
     // Note that the copy commands here use vkQueueWaitIdle to copy
     // sequentially. This should be fine here, as generating the mesh
     // should take longer than copying it to the device.
 }
 
-void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData,
-                                                  [[maybe_unused]] const std::string &id) {
+void GlfwVulkanWrapper::updateGraphAndFloorMeshes(std::array<IndexedMesh, 2> &newMeshData) {
     if (graphMesh.has_value()) {
         updateMesh(newMeshData[0], graphMesh.value());
     } else {
@@ -451,6 +454,7 @@ void GlfwVulkanWrapper::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDev
     submitInfo.pCommandBuffers    = &commandBuffer;
 
     vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    // TODO: Switch to using a fence here.
     vkQueueWaitIdle(graphicsQueue);
 
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);

@@ -9,8 +9,13 @@
 #include <GLFW/glfw3.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <optional>
+#include <thread>
+
+using FuncXZPtr = double (*)(double, double);
 
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
@@ -31,7 +36,10 @@ private:
     void handleUserInput();
 
     void drawFrame();
-    bool populateFunctionMeshes();
+    void populateFunctionMeshes();
+
+    void meshBuilderThreadPtr(const FuncXZPtr func);
+    void meshBuilderThreadUser(std::shared_ptr<UserFunction> func);
 
 private:
     static constexpr uint32_t INITIAL_WINDOW_WIDTH  = 1500;
@@ -45,12 +53,18 @@ private:
     GLFWwindow *window;
 
     AppState appState;
-    std::array<IndexedMesh, 2> meshesToRender;
-    std::shared_ptr<UserFunction> userFunction = nullptr;
 
     GlfwVulkanWrapper vulkan;
     ImGuiVulkanData imGuiVulkan;
     WindowEvents windowEvents;
+
+    std::shared_ptr<UserFunction> userFunction = nullptr;
+    // The main thread only touches these while meshReady is true.
+    std::array<IndexedMesh, 2> meshesToRender;
+
+    std::optional<std::thread> meshBuilder = std::nullopt;
+    // Set by mesh builder thread, cleared by main thread.
+    std::atomic_bool meshReady = false;
 };
 
 #endif // APPLICATION_H_

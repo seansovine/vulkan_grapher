@@ -19,6 +19,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -99,60 +101,57 @@ void Application::initUI() {
         });
 }
 
-bool Application::populateFunctionMeshes() {
+void Application::meshBuilderThreadPtr(const FuncXZPtr func) {
+    FunctionMesh mesh{func};
+    auto floorMesh = FunctionMesh::simpleFloorMesh();
+    meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    meshReady      = true;
+}
+
+void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func) {
+    FunctionMesh mesh{*func};
+    auto floorMesh = FunctionMesh::simpleFloorMesh();
+    meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    meshReady      = true;
+}
+
+void Application::populateFunctionMeshes() {
     using namespace math_util;
-
-    auto populateFromPtr = [this](double (*func)(double, double)) {
-        FunctionMesh mesh{func};
-        spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
-        spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
-
-        auto floorMesh = FunctionMesh::simpleFloorMesh();
-        meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
-                          IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-    };
 
     spdlog::debug("Building function meshes.");
 
     switch (appState.testFunc) {
     case TestFunc::Parabolic: {
-        populateFromPtr(TEST_FUNCTION_PARABOLIC);
+        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_PARABOLIC);
         break;
     }
     case TestFunc::ShiftedSinc: {
-        populateFromPtr(TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
+        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
         break;
     }
     case TestFunc::ExpSine: {
-        populateFromPtr(TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
+        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
         break;
     }
     case TestFunc::UserInput: {
         if (userFunction == nullptr) {
-            return false;
+            return;
         }
-        FunctionMesh mesh{*userFunction};
-        spdlog::debug(" - # function mesh vertices: {}", std::to_string(mesh.functionVertices().size()));
-        spdlog::debug(" - # function mesh indices:  {}", std::to_string(mesh.meshIndices().size()));
-
-        auto floorMesh = FunctionMesh::simpleFloorMesh();
-        meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
-                          IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-        userFunction   = nullptr;
+        meshBuilder  = std::thread(&Application::meshBuilderThreadUser, this, std::move(userFunction));
+        userFunction = nullptr;
         break;
     }
     default: {
         throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
     }
     }
-    return true;
 }
 
 void Application::initVulkan() {
     populateFunctionMeshes();
     vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
-    vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[appState.selectedFuncIndex()]);
-    meshesToRender = {};
 }
 
 void Application::initWindow() {
@@ -186,6 +185,19 @@ void Application::run() {
 
         drawFrame();
 
+        if (meshReady) {
+            spdlog::debug(" - # function mesh vertices: {}", std::to_string(meshesToRender[0].vertices.size()));
+            spdlog::debug(" - # function mesh indices:  {}", std::to_string(meshesToRender[0].indices.size()));
+
+            // Moves out of meshesToRender.
+            vulkan.updateGraphAndFloorMeshes(meshesToRender);
+
+            meshBuilder->join();
+            meshBuilder    = std::nullopt;
+            meshesToRender = {};
+            meshReady      = false;
+        }
+
         // Limit frame computation rate, as we target 60 FPS.
         constexpr int64_t timeout = 1000 * 1 / 65.0f;
         std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
@@ -204,10 +216,9 @@ void Application::handleUserInput() {
             userFunction                = nullptr;
             appState.functionParseError = true;
         }
-        // TODO: This should really be done on a background thread.
-        if (userFunction != nullptr && populateFunctionMeshes()) {
+        if (userFunction != nullptr) {
             appState.functionParseError = false;
-            vulkan.updateGraphAndFloorMeshes(meshesToRender, userFunction->userExpression());
+            populateFunctionMeshes();
         }
     }
 }
@@ -249,10 +260,7 @@ void Application::drawUI() {
     static int selectedItem = appState.selectedFuncIndex();
     if (ImGui::Combo("Choose function", &selectedItem, funcNames.data(), funcNames.size())) {
         appState.testFunc = static_cast<TestFunc>(selectedItem);
-        if (populateFunctionMeshes()) {
-            // TODO: This should really be done on a background thread.
-            vulkan.updateGraphAndFloorMeshes(meshesToRender, funcNames[selectedItem]);
-        }
+        populateFunctionMeshes();
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 

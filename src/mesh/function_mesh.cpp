@@ -85,11 +85,10 @@ void FunctionMesh::buildFloorMesh() {
 
     for (int i = 1; i <= NUM_CELLS; i++) {
         for (int j = 1; j <= NUM_CELLS; j++) {
-            // clang-format off
             SharedSquare square = std::make_shared<Square>();
 
             square->mTopLeft[0] = static_cast<float>((j - 1) * width);
-            square->mTopLeft[1] =     static_cast<float>((i - 1) * width);
+            square->mTopLeft[1] = static_cast<float>((i - 1) * width);
 
             square->mBtmRight[0] = static_cast<float>(j * width);
             square->mBtmRight[1] = static_cast<float>(i * width);
@@ -99,13 +98,13 @@ void FunctionMesh::buildFloorMesh() {
 
             // Assign neighbors in top-level grid.
             if (j >= 2) {
-                SharedSquare westNeighbor      = mFloorMeshSquares.at(mFloorMeshSquares.size() - 2);
-                square->westNeighbor    = westNeighbor;
+                SharedSquare westNeighbor  = mFloorMeshSquares.at(mFloorMeshSquares.size() - 2);
+                square->westNeighbor       = westNeighbor;
                 westNeighbor->eastNeighbor = square;
             }
             if (i >= 2) {
-                SharedSquare northNeighbor       = mFloorMeshSquares.at((i - 2) * NUM_CELLS + (j - 1));
-                square->northNeighbor     = northNeighbor;
+                SharedSquare northNeighbor   = mFloorMeshSquares.at((i - 2) * NUM_CELLS + (j - 1));
+                square->northNeighbor        = northNeighbor;
                 northNeighbor->southNeighbor = square;
             }
         }
@@ -310,7 +309,7 @@ void FunctionMesh::refine(SharedSquare square) {
         };
         square->children.push_back(std::make_shared<Square>(newSquare));
     }
-    SharedSquare topRightChild     = square->children.back();
+    SharedSquare topRightChild = square->children.back();
     topLeftChild->eastNeighbor = topRightChild;
 
     // Add bottom left child.
@@ -320,25 +319,25 @@ void FunctionMesh::refine(SharedSquare square) {
     uint32_t newCenterIdx3    = addVert(newCenterCoords3);
 
     {
-    Square newSquare ={
-        .mTopLeft  = {leftMiddle[0], leftMiddle[1]},
-        .mBtmRight = {btmMiddle[0], btmMiddle[1]},
+        Square newSquare = {
+            .mTopLeft  = {leftMiddle[0], leftMiddle[1]},
+            .mBtmRight = {btmMiddle[0], btmMiddle[1]},
 
-        .depth = childDepth,
+            .depth = childDepth,
 
-        .northNeighbor = topLeftChild,
-        .parent        = square,
+            .northNeighbor = topLeftChild,
+            .parent        = square,
 
-        .topLeftIdx     = leftMidIdx,
-        .topRightIdx    = square->centerIdx,
-        .bottomRightIdx = btmMidIdx,
-        .bottomLeftIdx  = square->bottomLeftIdx,
-        .centerIdx      = newCenterIdx3,
-    };
-    square->children.push_back(std::make_shared<Square>(newSquare));
-}
-    SharedSquare bottomLeftChild    = square->children.back();
-    topLeftChild->southNeighbor = bottomLeftChild;
+            .topLeftIdx     = leftMidIdx,
+            .topRightIdx    = square->centerIdx,
+            .bottomRightIdx = btmMidIdx,
+            .bottomLeftIdx  = square->bottomLeftIdx,
+            .centerIdx      = newCenterIdx3,
+        };
+        square->children.push_back(std::make_shared<Square>(newSquare));
+    }
+    SharedSquare bottomLeftChild = square->children.back();
+    topLeftChild->southNeighbor  = bottomLeftChild;
 
     // Add bottom right child.
 
@@ -347,26 +346,25 @@ void FunctionMesh::refine(SharedSquare square) {
     uint32_t newCenterIdx4    = addVert(newCenterCoords4);
 
     {
-    Square newSquare = {
-        .mTopLeft  = {center[0], center[1]},
-        .mBtmRight = {square->mBtmRight[0], square->mBtmRight[1]},
+        Square newSquare = {
+            .mTopLeft  = {center[0], center[1]},
+            .mBtmRight = {square->mBtmRight[0], square->mBtmRight[1]},
 
-        .depth = childDepth,
+            .depth = childDepth,
 
-        .northNeighbor = topRightChild,
-        .westNeighbor  = bottomLeftChild,
-        .parent        = square,
+            .northNeighbor = topRightChild,
+            .westNeighbor  = bottomLeftChild,
+            .parent        = square,
 
-        .topLeftIdx     = square->centerIdx,
-        .topRightIdx    = rightMidIdx,
-        .bottomRightIdx = square->bottomRightIdx,
-        .bottomLeftIdx  = btmMidIdx,
-        .centerIdx      = newCenterIdx4,
-    };
-    square->children.push_back(std::make_shared<Square>(newSquare));
-
-}
-    SharedSquare bottomRightChild     = square->children.back();
+            .topLeftIdx     = square->centerIdx,
+            .topRightIdx    = rightMidIdx,
+            .bottomRightIdx = square->bottomRightIdx,
+            .bottomLeftIdx  = btmMidIdx,
+            .centerIdx      = newCenterIdx4,
+        };
+        square->children.push_back(std::make_shared<Square>(newSquare));
+    }
+    SharedSquare bottomRightChild = square->children.back();
     topRightChild->southNeighbor  = bottomRightChild;
     bottomLeftChild->eastNeighbor = bottomRightChild;
 
@@ -693,7 +691,6 @@ static SharedSquare getWestNeighbor(SharedSquare &square) {
     }
     return nullptr;
 }
-
 
 // Precondition: to and from are sorted left-to-right.
 void FunctionMesh::syncRefmtsHoriz(std::vector<uint32_t> &to, std::vector<uint32_t> &from) {
