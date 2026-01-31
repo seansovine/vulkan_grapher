@@ -169,16 +169,10 @@ bool FunctionMesh::shouldRefine(Square &square) {
 
     SquareFuncEval funcVals = evalFuncSquare(square);
 
-    maxF = std::max(maxF, funcVals.topLeftVal);
-    minF = std::min(minF, funcVals.topLeftVal);
-    maxF = std::max(maxF, funcVals.topRightVal);
-    minF = std::min(minF, funcVals.topRightVal);
-    maxF = std::max(maxF, funcVals.btmRightVal);
-    minF = std::min(minF, funcVals.btmRightVal);
-    maxF = std::max(maxF, funcVals.btmLeftVal);
-    minF = std::min(minF, funcVals.btmLeftVal);
-    maxF = std::max(maxF, funcVals.centerVal);
-    minF = std::min(minF, funcVals.centerVal);
+    maxF = std::max({funcVals.topLeftVal, funcVals.topRightVal, //
+                     funcVals.btmRightVal, funcVals.btmLeftVal, funcVals.centerVal});
+    minF = std::min({funcVals.topLeftVal, funcVals.topRightVal, //
+                     funcVals.btmRightVal, funcVals.btmLeftVal, funcVals.centerVal});
 
     double valueRange     = maxF - minF;
     double secondDerivMag = secondDerivEst(square);
