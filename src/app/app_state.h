@@ -93,7 +93,7 @@ public:
 
 class WindowEvents {
     // Mouse events.
-    bool leftMousePressed = false;
+    bool leftMouseDown = false;
     double lastMouseX;
     double lastMouseY;
 
@@ -145,11 +145,11 @@ public:
         }
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
             if (action == GLFW_PRESS) {
-                thisPtr->leftMousePressed           = true;
+                thisPtr->leftMouseDown              = true;
                 thisPtr->appState->mouseInteracting = true;
                 glfwGetCursorPos(window, &thisPtr->lastMouseX, &thisPtr->lastMouseX);
             } else if (action == GLFW_RELEASE) {
-                thisPtr->leftMousePressed           = false;
+                thisPtr->leftMouseDown              = false;
                 thisPtr->appState->mouseInteracting = false;
             }
         }
@@ -160,7 +160,7 @@ public:
         if (thisPtr->imGuiWantsMouse) {
             return;
         }
-        if (thisPtr->leftMousePressed) {
+        if (thisPtr->leftMouseDown) {
             double dx           = xpos - thisPtr->lastMouseX;
             double dy           = ypos - thisPtr->lastMouseY;
             thisPtr->lastMouseX = xpos;

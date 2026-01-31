@@ -78,8 +78,8 @@ struct Triangle {
     uint32_t vert3Idx = UINT32_MAX;
 
     // Normal vector in world coordinates.
-    glm::vec3 normal = {};
-    double area      = 0.0;
+    glm::dvec3 normal = {};
+    double area       = 0.0;
 };
 
 // --------------------
@@ -114,6 +114,13 @@ class FunctionMesh {
     // For interpolating between normal computation methods.
     static constexpr double SECOND_DERIV_CUTOFF       = 40.0;
     static constexpr double SECOND_DERIV_CUTOFF_WIDTH = 10.0;
+
+    // Default RGB colors for floor and function meshes.
+    static constexpr glm::vec3 FLOOR_COLOR         = {0.556f, 0.367f, 0.076f};
+    static constexpr glm::vec3 FUNCT_COLOR         = {0.070f, 0.336f, 0.594f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR1 = {0.0f, 1.0f, 0.0f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR2 = {1.0f, 0.5f, 0.0f};
+    static constexpr glm::vec3 REFINE_DEBUG_COLOR3 = {1.0f, 0.0f, 0.0f};
 
     const math_util::LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
@@ -424,12 +431,6 @@ private:
     std::function<FuncXZ> mFunc = nullptr;
     // Used to hold callable user function object or standard function pointer.
 
-    // Default RGB colors for floor and function meshes.
-    static constexpr glm::vec3 FLOOR_COLOR         = {0.556f, 0.367f, 0.076f};
-    static constexpr glm::vec3 FUNCT_COLOR         = {0.070f, 0.336f, 0.594f};
-    static constexpr glm::vec3 REFINE_DEBUG_COLOR1 = {0.0f, 1.0f, 0.0f};
-    static constexpr glm::vec3 REFINE_DEBUG_COLOR2 = {1.0f, 0.5f, 0.0f};
-
     // Ensure we don't overlow our index type: This check is
     // necessary, but not sufficient, because of mesh refinement.
     static_assert(static_cast<uint64_t>(NUM_CELLS) * static_cast<uint64_t>(NUM_CELLS) <
@@ -440,6 +441,9 @@ private:
 
     // Squares that make up x,y-plane mesh.
     std::vector<SharedSquare> mFloorMeshSquares = {};
+    // TODO: We might go back to allocating the squares in sequence,
+    // because this approach is definitely slower. But we'll have to
+    // make it safer than holding refs to vector elements.
 
     // Vertices of triangular tessellation built from squares.
     std::vector<Vertex> mFloorMeshVertices = {};

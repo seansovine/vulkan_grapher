@@ -216,8 +216,12 @@ void FunctionMesh::refine(SharedSquare square) {
             funcColor = REFINE_DEBUG_COLOR1;
             break;
         }
-        default: {
+        case 1: {
             funcColor = REFINE_DEBUG_COLOR2;
+            break;
+        }
+        default: {
+            funcColor = REFINE_DEBUG_COLOR3;
             break;
         }
         }
@@ -438,9 +442,9 @@ void FunctionMesh::addTriIndices(const Triangle &tri) {
 void FunctionMesh::setFuncVertTBNs() {
     // Assign normal and area to each triangle.
     for (Triangle &tri : mFunctionMeshTriangles) {
-        glm::vec3 &vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
-        glm::vec3 &vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
-        glm::vec3 &vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
+        glm::dvec3 vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
+        glm::dvec3 vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
+        glm::dvec3 vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
         tri.normal       = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
 
         double len1 = glm::length(vert1 - vert2);

@@ -19,6 +19,7 @@ using FuncXZPtr = double (*)(double, double);
 
 class Application {
     friend void framebufferResizeCallback(GLFWwindow *window, int width, int height);
+    friend void windowMovedCallback(GLFWwindow *window, int x, int y);
 
 public:
     Application();

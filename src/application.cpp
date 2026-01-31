@@ -33,6 +33,12 @@ void framebufferResizeCallback(GLFWwindow *window, [[maybe_unused]] int width, [
     app->framebufferResized = true;
     app->currentWidth       = static_cast<uint32_t>(width);
     app->currentHeight      = static_cast<uint32_t>(height);
+    // TODO: GLFW passes a mouse down (only) event on after title bar click.
+}
+
+void windowMovedCallback(GLFWwindow *window, [[maybe_unused]] int x, [[maybe_unused]] int y) {
+    [[maybe_unused]] auto app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+    // TODO: GLFW passes a mouse down (only) event on after title bar click.
 }
 
 // Class methods.
@@ -165,6 +171,7 @@ void Application::initWindow() {
     // Have GLFW store a pointer to this class instance for use in callbacks.
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetWindowPosCallback(window, windowMovedCallback);
 
     if (!window) {
         glfwTerminate();
@@ -176,6 +183,7 @@ void Application::initWindow() {
 
 void Application::run() {
     while (!glfwWindowShouldClose(window)) {
+        auto start = std::chrono::high_resolution_clock::now();
         glfwPollEvents();
         drawUI();
 
@@ -184,6 +192,13 @@ void Application::run() {
         handleUserInput();
 
         drawFrame();
+        auto now     = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start);
+
+        // Limit frame rate, target 60 FPS.
+        constexpr auto target = std::chrono::nanoseconds(static_cast<long>(1e9 / (double)60.0));
+        auto sleepTime        = std::max(std::chrono::nanoseconds(0), target - elapsed);
+        std::this_thread::sleep_for(sleepTime);
 
         if (meshReady) {
             spdlog::debug(" - # function mesh vertices: {}", std::to_string(meshesToRender[0].vertices.size()));
@@ -197,10 +212,6 @@ void Application::run() {
             meshesToRender = {};
             meshReady      = false;
         }
-
-        // Limit frame computation rate, as we target 60 FPS.
-        constexpr int64_t timeout = 1000 * 1 / 65.0f;
-        std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
     }
 
     vulkan.waitForDeviceIdle();
