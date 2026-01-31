@@ -16,19 +16,19 @@ configure-debug: src
 	@cmake . -DCMAKE_BUILD_TYPE=Debug -B build/debug
 
 run:
-	@build/release/src/renderer-app
+	@build/release/bin/renderer-app
 
 run-debug:
-	@build/debug/src/renderer-app
+	@build/debug/bin/renderer-app
 
 meshtest:
-	@build/src/dev/mesh-test
+	@build/release/bin/mesh-test
 
 shaderc: shaders/*.frag shaders/*.vert
 	@shaders/compile.sh
 
 valgrind:
-	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/debug/src/renderer-app
+	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/debug/bin/renderer-app
 
 valgrind-release:
-	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/release/src/renderer-app
+	@valgrind -s --leak-check=full --show-leak-kinds=all --track-origins=yes build/release/bin/renderer-app

@@ -1,9 +1,12 @@
 #include <function_mesh.h>
 
+#include <mesh_debug.h>
+
 #include <algorithm>
-#include <iostream>
 #include <limits>
 #include <string>
+
+#include <spdlog/spdlog.h>
 
 [[maybe_unused]]
 static auto TEST_FUNCTION_PARABOLIC = [](double x, double y) -> double {
@@ -20,10 +23,11 @@ static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
 };
 
 int main() {
-    std::cout << "Testing function mesh generation." << std::endl;
+    spdlog::set_level(spdlog::level::trace);
+    spdlog::info("Testing function mesh generation.");
 
     FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
-    std::cout << "Squares in top-level tessellation: " << std::to_string(mesh.tessellationSquare().size()) << std::endl;
+    spdlog::info("Squares in top-level tessellation: {}", std::to_string(mesh.tessellationSquare().size()));
 
     float maxY = std::numeric_limits<float>::lowest();
     float minY = std::numeric_limits<float>::max();
@@ -32,8 +36,29 @@ int main() {
         minY = std::min(minY, vertex.pos.y);
     }
 
-    std::cout << "Function mesh max y: " << std::to_string(maxY) << std::endl;
-    std::cout << "Function mesh min y: " << std::to_string(minY) << std::endl;
+    spdlog::info("Function mesh max y: {}", std::to_string(maxY));
+    spdlog::info("Function mesh min y: {}", std::to_string(minY));
 
-    std::cout << mesh.debugMesh() << std::endl;
+    if (false) {
+        spdlog::info(mesh.debugMesh());
+    }
+
+    MeshDebug meshDebug{std::move(mesh)};
+
+    [[maybe_unused]]
+    Box boundingBox1{
+        .topLeftX     = 0.25, //
+        .topLeftZ     = 0.5,  //
+        .bottomRightX = 0.5,  //
+        .bottomRightZ = 0.25  //
+    };
+    [[maybe_unused]]
+    Box boundingBox2{
+        .topLeftX     = 0.375, //
+        .topLeftZ     = 0.5,   //
+        .bottomRightX = 0.5,   //
+        .bottomRightZ = 0.375  //
+    };
+
+    meshDebug.meshVG("scratch/mesh_test.svg", boundingBox2);
 }

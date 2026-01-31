@@ -91,7 +91,10 @@ struct Triangle {
 
 using FuncXZ = double(double, double);
 
+class MeshDebug;
+
 class FunctionMesh {
+    friend class MeshDebug;
 
     static constexpr bool USE_NEW_MESH     = true;
     static constexpr bool SHOW_REFINEMENT  = true;
