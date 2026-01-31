@@ -49,6 +49,13 @@ of the magnitude of its second derivatives. If either of these exceeds a predefi
 then the cell is selected for refinement. In the future we'll add these threshold parameters
 to the UI for user selection.
 
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/refined_mesh_grid.png" alt="drawing" width="500" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
+The image shows a refined mesh with triangles added to make the mesh watertight. There is a utility
+included to make an SVG from a rectangle of the mesh grid for a function.
+
 ## PBR material shading
 
 <p align="center" margin="20px">
