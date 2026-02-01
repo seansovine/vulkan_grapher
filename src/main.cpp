@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 int main() {
+    std::locale::global(std::locale(""));
     spdlog::set_level(spdlog::level::trace);
 
     Application app;

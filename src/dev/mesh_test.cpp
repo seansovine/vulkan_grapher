@@ -60,5 +60,5 @@ int main() {
         .bottomRightZ = 0.375  //
     };
 
-    meshDebug.meshVG("scratch/mesh_test.svg", boundingBox2);
+    meshDebug.meshVG("scratch/mesh_test.svg", boundingBox1);
 }

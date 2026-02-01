@@ -108,8 +108,8 @@ class FunctionMesh {
     // add code to support deeper refinement later.
     static constexpr uint8_t MAX_REFINEMENT_DEPTH = 2;
 
-    static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.25;
-    static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 20.0;
+    static constexpr double REFINEMENT_THRESHOLD_VARIATION = 0.5;
+    static constexpr double REFINEMENT_THRESHOLD_2ND_DERIV = 30.0;
 
     // Increment for derivative estimates.
     static constexpr double H = 10e-6;

@@ -201,8 +201,10 @@ void Application::run() {
         std::this_thread::sleep_for(sleepTime);
 
         if (meshReady) {
-            spdlog::debug(" - # function mesh vertices: {}", std::to_string(meshesToRender[0].vertices.size()));
-            spdlog::debug(" - # function mesh indices:  {}", std::to_string(meshesToRender[0].indices.size()));
+            auto numVerts = fmt::format(std::locale(), "{:L}", meshesToRender[0].vertices.size());
+            auto numInds  = fmt::format(std::locale(), "{:L}", meshesToRender[0].indices.size());
+            spdlog::debug(" - # function mesh vertices: {}", numVerts);
+            spdlog::debug(" - # function mesh indices:  {}", numInds);
 
             // Moves out of meshesToRender.
             vulkan.updateGraphAndFloorMeshes(meshesToRender);
@@ -219,7 +221,7 @@ void Application::run() {
 
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
-    if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed) {
+    if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed && meshBuilder == std::nullopt) {
         userFunction = std::make_shared<UserFunction>();
         try {
             userFunction->assign(appState.functionInputBuffer.data());
@@ -310,10 +312,12 @@ void Application::drawFunctionInput() {
     ImGui::Text("Enter f(x, z):");
     ImGui::InputTextMultiline("user-func", appState.functionInputBuffer.data(), //
                               appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f));
-    if (!appState.functionParseError) {
-        ImGui::Text("Press enter to apply.");
-    } else {
+    if (appState.functionParseError) {
         ImGui::Text("Expression is invalid, please update.");
+    } else if (meshBuilder.has_value()) {
+        ImGui::Text("Building function mesh...");
+    } else {
+        ImGui::Text("Press enter to apply.");
     }
 
     ImGui::End();

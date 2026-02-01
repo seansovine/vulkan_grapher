@@ -181,7 +181,7 @@ public:
                                  [[maybe_unused]] int mods) {
         WindowEvents *thisPtr = getThisPtr(window);
         // We always handle enter.
-        if (key == GLFW_KEY_ENTER && action == GLFW_PRESS) {
+        if ((key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) && action == GLFW_PRESS) {
             thisPtr->appState->userGuiInput.enterPressed = true;
         }
         if (thisPtr->imGuiWantsKeyboard) {

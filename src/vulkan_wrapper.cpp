@@ -174,19 +174,6 @@ void GlfwVulkanWrapper::deinit() {
 // Rendering functions.
 
 void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapChainInfo.swapchain, UINT64_MAX,
-                                            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain();
-        return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        throw std::runtime_error("Unable to acquire swap chain!");
-    }
-
     UserGraphInput userInput = appState.takeUserGraphInput();
 
     double aspectRatio = swapChainInfo.swapChainExtent.width / (double)swapChainInfo.swapChainExtent.height;
@@ -220,6 +207,21 @@ void GlfwVulkanWrapper::drawFrame(AppState &appState, bool frameBufferResized) {
         if (floorMesh->needsUniformBufferWrite()) {
             floorMesh->updateUniformBuffer(currentFrame);
         }
+    }
+
+    // TODO: We can detect if scene changed and only re-record command buffers on change.
+
+    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(device, swapChainInfo.swapchain, UINT64_MAX,
+                                            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapchain();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Unable to acquire swap chain!");
     }
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
