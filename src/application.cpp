@@ -219,10 +219,34 @@ void Application::run() {
     vulkan.waitForDeviceIdle();
 }
 
+void Application::handleMeshGeneratorChange() {
+    if (meshBuilder.has_value()) {
+        // TODO: Disable triggering changes while mesh build in progress.
+        return;
+    }
+    if (appState.testFunc == TestFunc::UserInput) {
+        userFunction = std::make_shared<UserFunction>();
+        appState.trimFunctionInput();
+        try {
+            userFunction->assign(appState.functionInputBuffer.data());
+        } catch (const BadExpression &error) {
+            userFunction                = nullptr;
+            appState.functionParseError = true;
+        }
+        if (userFunction != nullptr) {
+            appState.functionParseError = false;
+            populateFunctionMeshes();
+        }
+    } else {
+        populateFunctionMeshes();
+    }
+}
+
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed && meshBuilder == std::nullopt) {
         userFunction = std::make_shared<UserFunction>();
+        appState.trimFunctionInput();
         try {
             userFunction->assign(appState.functionInputBuffer.data());
         } catch (const BadExpression &error) {
@@ -270,9 +294,17 @@ void Application::drawUI() {
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-    static int selectedItem = appState.selectedFuncIndex();
-    if (ImGui::Combo("Choose function", &selectedItem, funcNames.data(), funcNames.size())) {
-        appState.testFunc = static_cast<TestFunc>(selectedItem);
+    static int selectedMeshGenIndex = appState.meshGeneratorIndex();
+    if (ImGui::Combo("Mesh generator", &selectedMeshGenIndex, generatorNames.data(), generatorNames.size())) {
+        appState.meshGenerator = static_cast<MeshGenerator>(selectedMeshGenIndex);
+        spdlog::debug("Generator was changed.");
+        handleMeshGeneratorChange();
+    }
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+    static int selectedFuncIndex = appState.selectedFuncIndex();
+    if (ImGui::Combo("Choose function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
+        appState.testFunc = static_cast<TestFunc>(selectedFuncIndex);
         populateFunctionMeshes();
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));

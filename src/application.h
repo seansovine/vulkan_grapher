@@ -35,6 +35,7 @@ private:
     void drawUI();
     void drawFunctionInput();
     void handleUserInput();
+    void handleMeshGeneratorChange();
 
     void drawFrame();
     void populateFunctionMeshes();

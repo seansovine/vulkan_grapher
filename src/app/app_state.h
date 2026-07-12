@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <utility>
 
 #include <GLFW/glfw3.h>
@@ -29,6 +31,17 @@ static constexpr std::array<const char *, static_cast<size_t>(TestFunc::NUM_FUNC
     "User input",  //
 };
 
+enum class MeshGenerator : uint8_t {
+    BuiltIn        = 0,
+    Gmsh           = 1,
+    NUM_GENERATORS = 2,
+};
+
+static constexpr std::array<const char *, static_cast<size_t>(MeshGenerator::NUM_GENERATORS)> generatorNames = {
+    "Built-in", //
+    "Gmsh",     //
+};
+
 // User input data that is handled in renderer.
 struct UserGraphInput {
     double xUserRot   = 0.0;
@@ -46,6 +59,9 @@ struct UserGuiInput {
 struct AppState {
     // Function selection.
     TestFunc testFunc = TestFunc::ShiftedSinc;
+
+    // Backend to use for mesh generation.
+    MeshGenerator meshGenerator = MeshGenerator::BuiltIn;
 
     // User function input.
     static constexpr size_t INPUT_BUFFER_LEN               = 1024;
@@ -85,6 +101,21 @@ public:
 
     size_t selectedFuncIndex() {
         return static_cast<size_t>(testFunc);
+    }
+
+    size_t meshGeneratorIndex() {
+        return static_cast<size_t>(meshGenerator);
+    }
+
+    void trimFunctionInput() {
+        int len = std::strlen(functionInputBuffer.data());
+        for (int i = len - 1; i >= 0; --i) {
+            if (functionInputBuffer[i] == '\n' || std::isspace(static_cast<unsigned char>(functionInputBuffer[i]))) {
+                functionInputBuffer[i] = '\0';
+            } else {
+                break;
+            }
+        }
     }
 };
 

@@ -36,3 +36,7 @@ vkFlushMappedMemoryRanges(): pMemoryRanges[1].size is VK_WHOLE_SIZE and the mapp
 _Solution:_
 
 We upgraded our version of the ImGui library and that fixed it.
+
+## Some interesting example functions
+
++ `0.1*sin(100*x*z)`
