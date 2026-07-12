@@ -70,6 +70,9 @@ IndexedMesh gmshToIndexed() {
 
     gmsh::model::mesh::getNodes(nodeTags, coords, parametricCoords);
 
+    spdlog::trace("Num node tags:             {}", std::size(nodeTags));
+    spdlog::trace("Num coords:                {}", std::size(coords));
+
     IndexedMesh indexedMesh;
     indexedMesh.vertices.reserve(nodeTags.size());
     std::unordered_map<std::size_t, uint32_t> tagToIndex;
@@ -95,12 +98,21 @@ IndexedMesh gmshToIndexed() {
         if (elementTypes[typeIdx] != 2) {
             continue;
         }
-        for (std::size_t tag : elementNodeTags[typeIdx]) {
+        const auto &triElementNodeTags = elementNodeTags[typeIdx];
+
+        spdlog::trace("Num tri element tags:      {}", std::size(elementTags[typeIdx]));
+        spdlog::trace("Num tri element node tags: {}", std::size(triElementNodeTags));
+
+        for (std::size_t tag : triElementNodeTags) {
             indexedMesh.indices.push_back(tagToIndex[tag]);
         }
     }
 
     // TODO: We have enough information here to compute TBN vectors for vertices.
+    //
+    //  - Compute normal for each tri and map of vertices to incident tris.
+    //  - Assign average of incident normals to each vertex.
+    //  - Compute tangent + bitangents for vertices from normals in standard way.
 
     return indexedMesh;
 }
