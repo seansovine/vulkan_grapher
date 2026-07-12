@@ -155,6 +155,35 @@ void Application::populateFunctionMeshes() {
     }
 }
 
+void Application::populateMeshesGmsh() {
+    spdlog::debug("Building function meshes with Gmsh.");
+
+    std::string functionExpression{};
+    switch (appState.testFunc) {
+    case TestFunc::Parabolic: {
+        functionExpression = math_util::gmsh::TEST_FUNCTION_PARABOLIC_EXPR_;
+        break;
+    }
+    case TestFunc::ShiftedSinc: {
+        functionExpression = math_util::gmsh::TEST_FUNCTION_SINC_EXPR_;
+        break;
+    }
+    case TestFunc::ExpSine: {
+        functionExpression = math_util::gmsh::TEST_FUNCTION_EXP_SINE_EXPR_;
+        break;
+    }
+    case TestFunc::UserInput: {
+        spdlog::debug("User functions not yet supported by Gmsh backend.");
+        break;
+    }
+    default: {
+        throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
+    }
+    }
+
+    // TODO: Call into Gmsh wrapper; blocking for initial testing.
+}
+
 void Application::initVulkan() {
     populateFunctionMeshes();
     vulkan.init(window, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
@@ -209,8 +238,10 @@ void Application::run() {
             // Moves out of meshesToRender.
             vulkan.updateGraphAndFloorMeshes(meshesToRender);
 
-            meshBuilder->join();
-            meshBuilder    = std::nullopt;
+            if (meshBuilder.has_value()) {
+                meshBuilder->join();
+                meshBuilder = std::nullopt;
+            }
             meshesToRender = {};
             meshReady      = false;
         }

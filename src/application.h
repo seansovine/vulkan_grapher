@@ -39,6 +39,7 @@ private:
 
     void drawFrame();
     void populateFunctionMeshes();
+    void populateMeshesGmsh();
 
     void meshBuilderThreadPtr(const FuncXZPtr func);
     void meshBuilderThreadUser(std::shared_ptr<UserFunction> func);

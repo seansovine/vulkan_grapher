@@ -91,7 +91,7 @@ static auto expSine(double x, double z) -> double {
 static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE(double x, double z) -> double {
     constexpr double scale = 8.0;
     return 0.125 * expSine(scale * (x - 0.5), scale * (z - 0.5));
-};
+}; // TDOO.
 
 static UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
     "0.75 * sin(30.0 * sqrt(x * x + z * z)) / (30.0 * sqrt(x * x + z * z)) + 0.25"};
@@ -99,6 +99,20 @@ static UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
 static auto TEST_FUNCTION_SHIFTED_SCALED_SINC_USER = [](double x, double z) -> double {
     return TEST_FUNCTION_SCALED_SINC_USER_(x - 0.5, z - 0.5);
 };
+
+namespace gmsh {
+
+static constexpr const char *TEST_FUNCTION_PARABOLIC_EXPR_ = //
+    "0.75 - (u - 0.5) * (u - 0.5) - (v - 0.5) * (v - 0.5)";
+
+static constexpr const char *TEST_FUNCTION_SINC_EXPR_ =
+    "0.75 * sin(30.0 * sqrt((u + 0.01) * (u + 0.01) + (v + 0.01) * (v + 0.01))) /"
+    " (30.0 * sqrt((u + 0.01) * (u + 0.01) + (v + 0.01) * (v + 0.01))) + 0.25";
+
+static constexpr const char *TEST_FUNCTION_EXP_SINE_EXPR_ = //
+    "0.125 * exp(-1.0 * sin(64.0 * (u - 0.5) * (u - 0.5) + 64.0 * (v - 0.5) * (v - 0.5)))";
+
+} // namespace gmsh
 
 } // namespace math_util
 
