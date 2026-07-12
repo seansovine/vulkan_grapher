@@ -3,8 +3,10 @@
 
 #include <gmsh.h>
 
-struct Test {
-    int i = 0;
-};
+namespace gmsh_wrapper {
+
+void runGmsh(const std::string& functionExpr);
+
+}
 
 #endif // GMSH_WRAPPER_H_

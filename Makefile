@@ -7,10 +7,10 @@ clean:
 .PHONY: build build-debug configure configure-debug
 
 build: src
-	@cmake --build build/release
+	@cmake --build build/release -j 8
 
 build-debug: src
-	@cmake --build build/debug
+	@cmake --build build/debug -j 8
 
 configure: src
 	@cmake . -DCMAKE_BUILD_TYPE=Release -B build/release

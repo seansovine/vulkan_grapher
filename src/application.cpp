@@ -2,6 +2,7 @@
 
 #include "app_state.h"
 #include "function_mesh.h"
+#include "gmsh_wrapper.h"
 #include "mesh.h"
 #include "user_function.h"
 #include "util.h"
@@ -182,6 +183,7 @@ void Application::populateMeshesGmsh() {
     }
 
     // TODO: Call into Gmsh wrapper; blocking for initial testing.
+    gmsh_wrapper::runGmsh(functionExpression);
 }
 
 void Application::initVulkan() {
@@ -250,44 +252,52 @@ void Application::run() {
     vulkan.waitForDeviceIdle();
 }
 
+void Application::tryGetUserFunction() {
+    userFunction = std::make_shared<UserFunction>();
+    appState.trimFunctionInput();
+    try {
+        userFunction->assign(appState.functionInputBuffer.data());
+    } catch (const BadExpression &error) {
+        userFunction                = nullptr;
+        appState.functionParseError = true;
+    }
+    if (userFunction != nullptr) {
+        appState.functionParseError = false;
+        populateFunctionMeshes();
+    }
+}
+
 void Application::handleMeshGeneratorChange() {
     if (meshBuilder.has_value()) {
-        // TODO: Disable triggering changes while mesh build in progress.
+        spdlog::warn("Mesh generator change while mesh generation is in progress.");
         return;
+
+        // TODO: Disable generator changes while mesh build in progress or add cancel.
     }
-    if (appState.testFunc == TestFunc::UserInput) {
-        userFunction = std::make_shared<UserFunction>();
-        appState.trimFunctionInput();
-        try {
-            userFunction->assign(appState.functionInputBuffer.data());
-        } catch (const BadExpression &error) {
-            userFunction                = nullptr;
-            appState.functionParseError = true;
-        }
-        if (userFunction != nullptr) {
-            appState.functionParseError = false;
+
+    switch (appState.meshGenerator) {
+    case MeshGenerator::BuiltIn: {
+        if (appState.testFunc == TestFunc::UserInput) {
+            tryGetUserFunction();
+        } else {
             populateFunctionMeshes();
         }
-    } else {
-        populateFunctionMeshes();
+        break;
+    }
+    case MeshGenerator::Gmsh: {
+        populateMeshesGmsh();
+        break;
+    }
+    default: {
+        throw std::runtime_error("Invalid mesh generator in handleMeshGeneratorChange.");
+    }
     }
 }
 
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed && meshBuilder == std::nullopt) {
-        userFunction = std::make_shared<UserFunction>();
-        appState.trimFunctionInput();
-        try {
-            userFunction->assign(appState.functionInputBuffer.data());
-        } catch (const BadExpression &error) {
-            userFunction                = nullptr;
-            appState.functionParseError = true;
-        }
-        if (userFunction != nullptr) {
-            appState.functionParseError = false;
-            populateFunctionMeshes();
-        }
+        tryGetUserFunction();
     }
 }
 
@@ -328,7 +338,6 @@ void Application::drawUI() {
     static int selectedMeshGenIndex = appState.meshGeneratorIndex();
     if (ImGui::Combo("Mesh generator", &selectedMeshGenIndex, generatorNames.data(), generatorNames.size())) {
         appState.meshGenerator = static_cast<MeshGenerator>(selectedMeshGenIndex);
-        spdlog::debug("Generator was changed.");
         handleMeshGeneratorChange();
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
