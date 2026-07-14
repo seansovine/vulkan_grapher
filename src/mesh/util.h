@@ -1,5 +1,5 @@
-#ifndef MESH_UTIL_H_
-#define MESH_UTIL_H_
+#ifndef MATH_UTIL_H_
+#define MATH_UTIL_H_
 
 #include "user_function.h"
 
@@ -14,8 +14,7 @@
 namespace math_util {
 
 // Numerically stable Heron's formula found on Low Latency Trading Insights substack.
-[[maybe_unused]]
-static double triangleArea(double len1, double len2, double len3) {
+inline double triangleArea(double len1, double len2, double len3) {
     // Sort lengths.
     if (len2 > len1) {
         std::swap(len2, len1);
@@ -41,13 +40,11 @@ static double triangleArea(double len1, double len2, double len3) {
                   );
 }
 
-[[maybe_unused]]
-static std::string debugGlmVecTrunc(glm::dvec3 vec) {
+inline std::string debugGlmVecTrunc(glm::dvec3 vec) {
     return std::format("({:.6f}, {:.6f}, {:.6f})", vec.x, vec.y, vec.z);
 };
 
-[[maybe_unused]]
-static std::string debugGlmVec(glm::dvec3 vec) {
+inline std::string debugGlmVec(glm::dvec3 vec) {
     return std::format("({}, {}, {})", vec.x, vec.y, vec.z);
 };
 
@@ -69,51 +66,50 @@ public:
     }
 };
 
-[[maybe_unused]]
-static auto TEST_FUNCTION_PARABOLIC(double x, double z) -> double {
+inline auto TEST_FUNCTION_PARABOLIC(double x, double z) -> double {
     return 0.75 - (x - 0.5) * (x - 0.5) - (z - 0.5) * (z - 0.5);
 };
 
-static auto sinc(double x, double z) -> double {
+inline auto sinc(double x, double z) -> double {
     constexpr double scale = 30; // 100
     double mag             = scale * std::sqrt(x * x + z * z);
     return mag == 0.0 ? 1.0 : std::sin(mag) / mag;
 };
-[[maybe_unused]]
-static auto TEST_FUNCTION_SHIFTED_SCALED_SINC(double x, double z) -> double {
+
+inline auto TEST_FUNCTION_SHIFTED_SCALED_SINC(double x, double z) -> double {
     return 0.75 * sinc(x - 0.5, z - 0.5) + 0.25; //
 };
 
-static auto expSine(double x, double z) -> double {
+inline auto expSine(double x, double z) -> double {
     return std::pow(std::numbers::e, -std::sin(x * x + z * z));
 };
-[[maybe_unused]]
-static auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE(double x, double z) -> double {
+
+inline auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE(double x, double z) -> double {
     constexpr double scale = 8.0;
     return 0.125 * expSine(scale * (x - 0.5), scale * (z - 0.5));
 }; // TDOO.
 
-static UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
+inline UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
     "0.75 * sin(30.0 * sqrt(x * x + z * z)) / (30.0 * sqrt(x * x + z * z)) + 0.25"};
 
-static auto TEST_FUNCTION_SHIFTED_SCALED_SINC_USER = [](double x, double z) -> double {
+inline auto TEST_FUNCTION_SHIFTED_SCALED_SINC_USER = [](double x, double z) -> double {
     return TEST_FUNCTION_SCALED_SINC_USER_(x - 0.5, z - 0.5);
 };
 
 namespace gmsh {
 
-static constexpr const char *TEST_FUNCTION_PARABOLIC_EXPR_ = //
+inline constexpr const char *TEST_FUNCTION_PARABOLIC_EXPR_ = //
     "0.75 - (u - 0.5) * (u - 0.5) - (v - 0.5) * (v - 0.5)";
 
-static constexpr const char *TEST_FUNCTION_SINC_EXPR_ =
+inline constexpr const char *TEST_FUNCTION_SINC_EXPR_ =
     "0.75 * sin(30.0 * sqrt((u + 0.01) * (u + 0.01) + (v + 0.01) * (v + 0.01))) /"
     " (30.0 * sqrt((u + 0.01) * (u + 0.01) + (v + 0.01) * (v + 0.01))) + 0.25";
 
-static constexpr const char *TEST_FUNCTION_EXP_SINE_EXPR_ = //
+inline constexpr const char *TEST_FUNCTION_EXP_SINE_EXPR_ = //
     "0.125 * exp(-1.0 * sin(64.0 * (u - 0.5) * (u - 0.5) + 64.0 * (v - 0.5) * (v - 0.5)))";
 
 } // namespace gmsh
 
 } // namespace math_util
 
-#endif // MESH_UTIL_H_
+#endif // MATH_UTIL_H_

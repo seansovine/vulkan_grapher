@@ -19,10 +19,10 @@ configure-debug: src
 	@cmake . -DCMAKE_BUILD_TYPE=Debug -B build/debug
 
 database:
-	ln -s build/release/compile_commands.json compile_commands.json
+	ln -sf build/release/compile_commands.json compile_commands.json
 
 database-debug:
-	ln -s build/debug/compile_commands.json compile_commands.json
+	ln -sf build/debug/compile_commands.json compile_commands.json
 
 run:
 	@build/release/bin/renderer-app

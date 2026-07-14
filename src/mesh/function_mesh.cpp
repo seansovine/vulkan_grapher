@@ -1,6 +1,7 @@
 #include "function_mesh.h"
 
 #include "mesh.h"
+#include "mesh_util.h"
 #include "util.h"
 
 #include <glm/fwd.hpp>
@@ -436,15 +437,7 @@ void FunctionMesh::addTriIndices(const Triangle &tri) {
 void FunctionMesh::setFuncVertTBNs() {
     // Assign normal and area to each triangle.
     for (Triangle &tri : mFunctionMeshTriangles) {
-        glm::dvec3 vert1 = mFunctionMeshVertices[tri.vert1Idx].pos;
-        glm::dvec3 vert2 = mFunctionMeshVertices[tri.vert2Idx].pos;
-        glm::dvec3 vert3 = mFunctionMeshVertices[tri.vert3Idx].pos;
-        tri.normal       = glm::normalize(glm::cross(vert2 - vert1, vert3 - vert1));
-
-        double len1 = glm::length(vert1 - vert2);
-        double len2 = glm::length(vert2 - vert3);
-        double len3 = glm::length(vert3 - vert1);
-        tri.area    = math_util::triangleArea(len1, len2, len3);
+        mesh_util::assignTriangleNormalArea(tri, mFunctionMeshVertices);
     }
 
     constexpr glm::dvec3 xDir = {1.0f, 0.0f, 0.0f};

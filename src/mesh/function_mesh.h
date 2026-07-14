@@ -2,6 +2,7 @@
 #define FUNCTION_MESH_H_
 
 #include "mesh.h"
+#include "mesh_util.h"
 #include "util.h"
 
 #include <cstddef>
@@ -70,16 +71,6 @@ struct Square {
     EdgeRefinements edgeRefinements = {};
 
     const EdgeRefinements &populateRefinements();
-};
-
-struct Triangle {
-    uint32_t vert1Idx = UINT32_MAX;
-    uint32_t vert2Idx = UINT32_MAX;
-    uint32_t vert3Idx = UINT32_MAX;
-
-    // Normal vector in world coordinates.
-    glm::dvec3 normal = {};
-    double area       = 0.0;
 };
 
 // --------------------

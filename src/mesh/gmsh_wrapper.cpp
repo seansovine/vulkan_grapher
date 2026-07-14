@@ -1,9 +1,20 @@
 #include "gmsh_wrapper.h"
 
 #include "mesh.h"
+#include "mesh_util.h"
 
+#include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
+
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <gmsh.h>
+#include <iterator>
 #include <spdlog/spdlog.h>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace gmsh_wrapper {
 
@@ -63,7 +74,7 @@ void buildMesh(const std::string &functionDef, MeshDomain2D domain, double meshS
     }
 }
 
-IndexedMesh gmshToIndexed() {
+VertsAndIndices gmshToIndexed() {
     std::vector<std::size_t> nodeTags;
     std::vector<double> coords;
     std::vector<double> parametricCoords;
@@ -73,7 +84,7 @@ IndexedMesh gmshToIndexed() {
     spdlog::trace("Num node tags:             {}", std::size(nodeTags));
     spdlog::trace("Num coords:                {}", std::size(coords));
 
-    IndexedMesh indexedMesh;
+    VertsAndIndices indexedMesh;
     indexedMesh.vertices.reserve(nodeTags.size());
     std::unordered_map<std::size_t, uint32_t> tagToIndex;
 
@@ -94,30 +105,47 @@ IndexedMesh gmshToIndexed() {
 
     gmsh::model::mesh::getElements(elementTypes, elementTags, elementNodeTags);
 
+    // Maps vertex to set of triangles it is incident to.
+    std::unordered_map<uint32_t, std::unordered_set<uint32_t>> vertIndexToTriIndices{};
+    vertIndexToTriIndices.reserve(std::size(tagToIndex));
+    std::vector<Triangle> triangles{};
+
     for (std::size_t typeIdx = 0; typeIdx < elementTypes.size(); ++typeIdx) {
         if (elementTypes[typeIdx] != 2) {
             continue;
         }
         const auto &triElementNodeTags = elementNodeTags[typeIdx];
+        assert(std::size(triElementNodeTags) % 3 == 0);
+        uint32_t numTris = std::size(triElementNodeTags) / 3;
+        triangles.reserve(numTris);
 
         spdlog::trace("Num tri element tags:      {}", std::size(elementTags[typeIdx]));
         spdlog::trace("Num tri element node tags: {}", std::size(triElementNodeTags));
-
-        for (std::size_t tag : triElementNodeTags) {
-            indexedMesh.indices.push_back(tagToIndex[tag]);
+        for (uint32_t triIndex = 0; triIndex < numTris; ++triIndex) {
+            uint32_t vert1Index = tagToIndex[3 * triIndex];
+            uint32_t vert2Index = tagToIndex[3 * triIndex + 1];
+            uint32_t vert3Index = tagToIndex[3 * triIndex + 2];
+            vertIndexToTriIndices[vert1Index].insert(triIndex);
+            vertIndexToTriIndices[vert2Index].insert(triIndex);
+            vertIndexToTriIndices[vert3Index].insert(triIndex);
+            triangles.push_back({vert1Index, vert2Index, vert3Index});
         }
     }
+    spdlog::trace("Num triangles:             {}", std::size(triangles));
 
-    // TODO: We have enough information here to compute TBN vectors for vertices.
-    //
-    //  - Compute normal for each tri and map of vertices to incident tris.
+    // Assign normal and area to triangles.
+    for (auto &tri : triangles) {
+        mesh_util::assignTriangleNormalArea(tri, indexedMesh.vertices);
+    }
+
+    // TODO: We have enough information here to compute TBN vectors for vertices. So:
     //  - Assign average of incident normals to each vertex.
     //  - Compute tangent + bitangents for vertices from normals in standard way.
 
     return indexedMesh;
 }
 
-void runGmsh(const std::string &functionExpr) {
+VertsAndIndices runGmsh(const std::string &functionExpr) {
     spdlog::debug("Running Gmsh.");
 
     gmsh::initialize(0, nullptr, false);
@@ -127,10 +155,10 @@ void runGmsh(const std::string &functionExpr) {
 
     buildMesh(functionExpr, DEFAULT_DOMAIN, MESH_SIZE, COLLAPSE_Z);
 
-    IndexedMesh _ = gmshToIndexed();
-    // TODO: Convert Gmsh mesh to fully-defined indexed mesh return.
+    VertsAndIndices indexedMesh = gmshToIndexed();
 
     gmsh::finalize();
+    return indexedMesh;
 }
 
 } // namespace gmsh_wrapper
