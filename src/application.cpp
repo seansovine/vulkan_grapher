@@ -9,10 +9,12 @@
 #include "vulkan_wrapper.h"
 
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
 #include <spdlog/spdlog.h>
+#include <utility>
 #include <vk_video/vulkan_video_codec_h265std.h>
 #include <vulkan/vulkan_core.h>
 
@@ -182,8 +184,12 @@ void Application::populateMeshesGmsh() {
     }
     }
 
-    // TODO: Call into Gmsh wrapper; blocking for initial testing.
-    gmsh_wrapper::runGmsh(functionExpression);
+    // Call into Gmsh wrapper; this version blocks main thread, for initial testing.
+    gmsh_wrapper::VertsAndIndices vertsAndInds = gmsh_wrapper::runGmsh(functionExpression);
+    auto floorMesh                             = FunctionMesh::simpleFloorMesh();
+    meshesToRender = {IndexedMesh{std::move(vertsAndInds.vertices), std::move(vertsAndInds.indices)},
+                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    meshReady      = true;
 }
 
 void Application::initVulkan() {

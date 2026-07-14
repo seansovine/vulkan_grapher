@@ -93,8 +93,9 @@ VertsAndIndices gmshToIndexed() {
 
         Vertex v;
         v.pos.x = coords[3 * i + 0];
-        v.pos.y = coords[3 * i + 1];
-        v.pos.z = coords[3 * i + 2];
+        v.pos.y = coords[3 * i + 2];
+        v.pos.z = coords[3 * i + 1];
+        // We use "OpenGL coordinates" where y is up.
 
         indexedMesh.vertices.push_back(v);
     }
@@ -106,7 +107,7 @@ VertsAndIndices gmshToIndexed() {
     gmsh::model::mesh::getElements(elementTypes, elementTags, elementNodeTags);
 
     // Maps vertex to set of triangles it is incident to.
-    std::unordered_map<uint32_t, std::unordered_set<uint32_t>> vertIndexToTriIndices{};
+    std::unordered_map<uint32_t, std::vector<uint32_t>> vertIndexToTriIndices{};
     vertIndexToTriIndices.reserve(std::size(tagToIndex));
     std::vector<Triangle> triangles{};
 
@@ -122,26 +123,32 @@ VertsAndIndices gmshToIndexed() {
         spdlog::trace("Num tri element tags:      {}", std::size(elementTags[typeIdx]));
         spdlog::trace("Num tri element node tags: {}", std::size(triElementNodeTags));
         for (uint32_t triIndex = 0; triIndex < numTris; ++triIndex) {
-            uint32_t vert1Index = tagToIndex[3 * triIndex];
-            uint32_t vert2Index = tagToIndex[3 * triIndex + 1];
-            uint32_t vert3Index = tagToIndex[3 * triIndex + 2];
-            vertIndexToTriIndices[vert1Index].insert(triIndex);
-            vertIndexToTriIndices[vert2Index].insert(triIndex);
-            vertIndexToTriIndices[vert3Index].insert(triIndex);
+            uint32_t vert1Index = tagToIndex[triElementNodeTags[3 * triIndex + 0]];
+            uint32_t vert2Index = tagToIndex[triElementNodeTags[3 * triIndex + 1]];
+            uint32_t vert3Index = tagToIndex[triElementNodeTags[3 * triIndex + 2]];
+            vertIndexToTriIndices[vert1Index].push_back(triIndex);
+            vertIndexToTriIndices[vert2Index].push_back(triIndex);
+            vertIndexToTriIndices[vert3Index].push_back(triIndex);
             triangles.push_back({vert1Index, vert2Index, vert3Index});
         }
     }
     spdlog::trace("Num triangles:             {}", std::size(triangles));
 
-    // Assign normal and area to triangles.
+    // Assign normal and area to triangles and add indices.
+    indexedMesh.indices.reserve(3 * std::size(triangles));
     for (auto &tri : triangles) {
         mesh_util::assignTriangleNormalArea(tri, indexedMesh.vertices);
+
+        indexedMesh.indices.push_back(tri.vert1Idx);
+        indexedMesh.indices.push_back(tri.vert2Idx);
+        indexedMesh.indices.push_back(tri.vert3Idx);
     }
 
-    // TODO: We have enough information here to compute TBN vectors for vertices. So:
-    //  - Assign average of incident normals to each vertex.
-    //  - Compute tangent + bitangents for vertices from normals in standard way.
-
+    // Assign TBN vectors to vertices.
+    for (uint32_t vert_i = 0; vert_i < std::size(indexedMesh.vertices); ++vert_i) {
+        Vertex &vert = indexedMesh.vertices[vert_i];
+        mesh_util::assignVertTBNGmsh(vert, vertIndexToTriIndices[vert_i], triangles);
+    }
     return indexedMesh;
 }
 
