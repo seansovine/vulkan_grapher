@@ -40,6 +40,7 @@ private:
 
     void drawFrame();
     void populateFunctionMeshes();
+    void populateMeshesBuiltIn();
     void populateMeshesGmsh();
 
     void meshBuilderThreadPtr(const FuncXZPtr func);

@@ -65,8 +65,9 @@ struct AppState {
 
     // User function input.
     static constexpr size_t INPUT_BUFFER_LEN               = 1024;
-    std::array<char, INPUT_BUFFER_LEN> functionInputBuffer = {0};
+    std::array<char, INPUT_BUFFER_LEN> functionInputBuffer = {'\0'};
     bool functionParseError                                = false;
+    bool functionInputCursorReset                          = false;
 
     // Render preferences.
     bool rotating        = false;
@@ -107,15 +108,23 @@ public:
         return static_cast<size_t>(meshGenerator);
     }
 
-    void trimFunctionInput() {
-        int len = std::strlen(functionInputBuffer.data());
+    size_t textBufferLen() {
+        return std::strlen(functionInputBuffer.data());
+    }
+
+    static void trimBuffer(char *buffer, size_t len) {
         for (int i = len - 1; i >= 0; --i) {
-            if (functionInputBuffer[i] == '\n' || std::isspace(static_cast<unsigned char>(functionInputBuffer[i]))) {
-                functionInputBuffer[i] = '\0';
+            if (std::isspace(static_cast<unsigned char>(buffer[i]))) {
+                buffer[i] = '\0';
             } else {
                 break;
             }
         }
+    }
+
+    void trimFunctionInput() {
+        int len = textBufferLen();
+        trimBuffer(functionInputBuffer.data(), len);
     }
 };
 

@@ -48,8 +48,8 @@ public:
 
     void assign(const std::string &inExpression) {
         ctx.add_builtins();
-        ctx.add_variable("x", 0 * sizeof(double));
-        ctx.add_variable("z", 1 * sizeof(double));
+        ctx.add_variable("u", 0 * sizeof(double));
+        ctx.add_variable("v", 1 * sizeof(double));
 
         mathpresso::Error err = exp.compile(ctx, inExpression.c_str(), mathpresso::kNoOptions);
 

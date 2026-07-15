@@ -90,7 +90,7 @@ inline auto TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE(double x, double z) -> double 
 }; // TDOO.
 
 inline UserFunction TEST_FUNCTION_SCALED_SINC_USER_ = {
-    "0.75 * sin(30.0 * sqrt(x * x + z * z)) / (30.0 * sqrt(x * x + z * z)) + 0.25"};
+    "0.75 * sin(30.0 * sqrt(u * u + v * v)) / (30.0 * sqrt(u * u + v * v)) + 0.25"};
 
 inline auto TEST_FUNCTION_SHIFTED_SCALED_SINC_USER = [](double x, double z) -> double {
     return TEST_FUNCTION_SCALED_SINC_USER_(x - 0.5, z - 0.5);

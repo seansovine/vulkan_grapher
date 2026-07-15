@@ -9,15 +9,12 @@
 #include "vulkan_wrapper.h"
 
 #include <GLFW/glfw3.h>
-#include <algorithm>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/imgui.h>
 #include <spdlog/spdlog.h>
-#include <utility>
-#include <vk_video/vulkan_video_codec_h265std.h>
-#include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -27,6 +24,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 // GLFW callbacks.
@@ -127,6 +125,22 @@ void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func) {
 }
 
 void Application::populateFunctionMeshes() {
+    switch (appState.meshGenerator) {
+    case MeshGenerator::BuiltIn: {
+        populateMeshesBuiltIn();
+        break;
+    }
+    case MeshGenerator::Gmsh: {
+        populateMeshesGmsh();
+        break;
+    }
+    default: {
+        throw std::runtime_error("Invalid mesh generator setting.");
+    }
+    }
+}
+
+void Application::populateMeshesBuiltIn() {
     using namespace math_util;
 
     spdlog::debug("Building function meshes.");
@@ -145,6 +159,11 @@ void Application::populateFunctionMeshes() {
         break;
     }
     case TestFunc::UserInput: {
+        if (appState.textBufferLen() == 0) {
+            userFunction                = nullptr;
+            appState.functionParseError = false;
+            return;
+        }
         if (userFunction == nullptr) {
             return;
         }
@@ -176,7 +195,11 @@ void Application::populateMeshesGmsh() {
         break;
     }
     case TestFunc::UserInput: {
-        spdlog::debug("User functions not yet supported by Gmsh backend.");
+        if (appState.textBufferLen() != 0) {
+            functionExpression = appState.functionInputBuffer.data();
+        } else {
+            return;
+        }
         break;
     }
     default: {
@@ -185,8 +208,15 @@ void Application::populateMeshesGmsh() {
     }
 
     // Call into Gmsh wrapper; this version blocks main thread, for initial testing.
-    gmsh_wrapper::VertsAndIndices vertsAndInds = gmsh_wrapper::runGmsh(functionExpression);
-    auto floorMesh                             = FunctionMesh::simpleFloorMesh();
+    gmsh_wrapper::VertsAndIndices vertsAndInds{};
+    try {
+        vertsAndInds = gmsh_wrapper::runGmsh(functionExpression);
+    } catch (const std::exception &e) {
+        spdlog::debug("Gmsh error: {}", e.what());
+        appState.functionParseError = true;
+        return;
+    }
+    auto floorMesh = FunctionMesh::simpleFloorMesh();
     meshesToRender = {IndexedMesh{std::move(vertsAndInds.vertices), std::move(vertsAndInds.indices)},
                       IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
     meshReady      = true;
@@ -291,7 +321,7 @@ void Application::handleMeshGeneratorChange() {
         break;
     }
     case MeshGenerator::Gmsh: {
-        populateMeshesGmsh();
+        populateFunctionMeshes();
         break;
     }
     default: {
@@ -303,6 +333,8 @@ void Application::handleMeshGeneratorChange() {
 void Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed && meshBuilder == std::nullopt) {
+        appState.trimFunctionInput();
+        appState.functionInputCursorReset = true;
         tryGetUserFunction();
     }
 }
@@ -385,11 +417,25 @@ void Application::drawFunctionInput() {
     ImVec2 windowLocation = {10.0f, currentHeight - WINDOW_SIZE.y - 10};
     ImGui::SetNextWindowPos(windowLocation, ImGuiCond_Appearing);
 
-    ImGui::Begin("Function y = f(x, z).");
+    ImGui::Begin("Function y = f(u, v).");
 
-    ImGui::Text("Enter f(x, z):");
+    auto scrollToEnd = [](ImGuiInputTextCallbackData *data) -> int {
+        AppState *pState = (AppState *)data->UserData;
+        if (pState->functionInputCursorReset) {
+            data->BufTextLen = pState->textBufferLen();
+            AppState::trimBuffer(data->Buf, std::strlen(data->Buf));
+            data->CursorPos                  = data->BufTextLen;
+            data->SelectionStart             = data->BufTextLen;
+            data->SelectionEnd               = data->BufTextLen;
+            pState->functionInputCursorReset = false;
+        }
+        return 0;
+    };
+
+    ImGui::Text("Enter f(u, v):");
     ImGui::InputTextMultiline("user-func", appState.functionInputBuffer.data(), //
-                              appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f));
+                              appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f),
+                              ImGuiInputTextFlags_CallbackAlways, scrollToEnd, &appState);
     if (appState.functionParseError) {
         ImGui::Text("Expression is invalid, please update.");
     } else if (meshBuilder.has_value()) {
