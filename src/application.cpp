@@ -34,15 +34,14 @@ void framebufferResizeCallback(GLFWwindow *window, [[maybe_unused]] int width, [
     app->framebufferResized = true;
     app->currentWidth       = static_cast<uint32_t>(width);
     app->currentHeight      = static_cast<uint32_t>(height);
-    // TODO: GLFW passes a mouse down (only) event on after title bar click.
 }
 
 void windowMovedCallback(GLFWwindow *window, [[maybe_unused]] int x, [[maybe_unused]] int y) {
     [[maybe_unused]] auto app = static_cast<Application *>(glfwGetWindowUserPointer(window));
-    // TODO: GLFW passes a mouse down (only) event on after title bar click.
+    // TODO: GLFW passes a mouse down (only) event on title bar click that needs special handling.
 }
 
-// Class methods.
+// Main class startup and shutdown.
 
 Application::Application() {
     initWindow();
@@ -110,18 +109,39 @@ void Application::initUI() {
 
 void Application::meshBuilderThreadPtr(const FuncXZPtr func) {
     FunctionMesh mesh{func};
-    auto floorMesh = FunctionMesh::simpleFloorMesh();
-    meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
-                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-    meshReady      = true;
+    auto floorMesh      = FunctionMesh::simpleFloorMesh();
+    meshesToRender      = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    backgroundWorkReady = true;
 }
 
 void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func) {
     FunctionMesh mesh{*func};
-    auto floorMesh = FunctionMesh::simpleFloorMesh();
-    meshesToRender = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
-                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-    meshReady      = true;
+    auto floorMesh      = FunctionMesh::simpleFloorMesh();
+    meshesToRender      = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    backgroundWorkReady = true;
+}
+
+void Application::meshBuilderThreadGmsh(std::string funcExpression) {
+    // Call into Gmsh wrapper; this version blocks main thread, for initial testing.
+    gmsh_wrapper::VertsAndIndices vertsAndInds{};
+    try {
+        vertsAndInds = gmsh_wrapper::runGmsh(funcExpression);
+    } catch (const std::exception &e) {
+        spdlog::debug("Gmsh error: {}", e.what());
+        appState.functionParseError = true;
+        backgroundWorkReady         = true;
+        return;
+    }
+    auto floorMesh      = FunctionMesh::simpleFloorMesh();
+    meshesToRender      = {IndexedMesh{std::move(vertsAndInds.vertices), std::move(vertsAndInds.indices)},
+                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    backgroundWorkReady = true;
+}
+
+bool Application::backgroundInProgress() {
+    return meshBuilder.has_value();
 }
 
 void Application::populateFunctionMeshes() {
@@ -207,19 +227,7 @@ void Application::populateMeshesGmsh() {
     }
     }
 
-    // Call into Gmsh wrapper; this version blocks main thread, for initial testing.
-    gmsh_wrapper::VertsAndIndices vertsAndInds{};
-    try {
-        vertsAndInds = gmsh_wrapper::runGmsh(functionExpression);
-    } catch (const std::exception &e) {
-        spdlog::debug("Gmsh error: {}", e.what());
-        appState.functionParseError = true;
-        return;
-    }
-    auto floorMesh = FunctionMesh::simpleFloorMesh();
-    meshesToRender = {IndexedMesh{std::move(vertsAndInds.vertices), std::move(vertsAndInds.indices)},
-                      IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
-    meshReady      = true;
+    meshBuilder = std::thread(&Application::meshBuilderThreadGmsh, this, std::move(functionExpression));
 }
 
 void Application::initVulkan() {
@@ -267,21 +275,23 @@ void Application::run() {
         auto sleepTime        = std::max(std::chrono::nanoseconds(0), target - elapsed);
         std::this_thread::sleep_for(sleepTime);
 
-        if (meshReady) {
-            auto numVerts = fmt::format(std::locale(), "{:L}", meshesToRender[0].vertices.size());
-            auto numInds  = fmt::format(std::locale(), "{:L}", meshesToRender[0].indices.size());
-            spdlog::debug(" - # function mesh vertices: {}", numVerts);
-            spdlog::debug(" - # function mesh indices:  {}", numInds);
+        if (backgroundWorkReady) {
+            if (!appState.functionParseError) {
+                auto numVerts = fmt::format(std::locale(), "{:L}", meshesToRender[0].vertices.size());
+                auto numInds  = fmt::format(std::locale(), "{:L}", meshesToRender[0].indices.size());
+                spdlog::debug(" - # function mesh vertices: {}", numVerts);
+                spdlog::debug(" - # function mesh indices:  {}", numInds);
 
-            // Moves out of meshesToRender.
-            vulkan.updateGraphAndFloorMeshes(meshesToRender);
+                // Moves out of meshesToRender.
+                vulkan.updateGraphAndFloorMeshes(meshesToRender);
+            }
 
             if (meshBuilder.has_value()) {
                 meshBuilder->join();
                 meshBuilder = std::nullopt;
             }
-            meshesToRender = {};
-            meshReady      = false;
+            meshesToRender      = {};
+            backgroundWorkReady = false;
         }
     }
 
@@ -307,8 +317,6 @@ void Application::handleMeshGeneratorChange() {
     if (meshBuilder.has_value()) {
         spdlog::warn("Mesh generator change while mesh generation is in progress.");
         return;
-
-        // TODO: Disable generator changes while mesh build in progress or add cancel.
     }
 
     switch (appState.meshGenerator) {
@@ -373,19 +381,23 @@ void Application::drawUI() {
     }
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-    static int selectedMeshGenIndex = appState.meshGeneratorIndex();
-    if (ImGui::Combo("Mesh generator", &selectedMeshGenIndex, generatorNames.data(), generatorNames.size())) {
-        appState.meshGenerator = static_cast<MeshGenerator>(selectedMeshGenIndex);
-        handleMeshGeneratorChange();
-    }
-    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::BeginDisabled(backgroundInProgress());
+    {
+        static int selectedMeshGenIndex = appState.meshGeneratorIndex();
+        if (ImGui::Combo("Mesh generator", &selectedMeshGenIndex, generatorNames.data(), generatorNames.size())) {
+            appState.meshGenerator = static_cast<MeshGenerator>(selectedMeshGenIndex);
+            handleMeshGeneratorChange();
+        }
+        ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-    static int selectedFuncIndex = appState.selectedFuncIndex();
-    if (ImGui::Combo("Choose function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
-        appState.testFunc = static_cast<TestFunc>(selectedFuncIndex);
-        populateFunctionMeshes();
+        static int selectedFuncIndex = appState.selectedFuncIndex();
+        if (ImGui::Combo("Choose function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
+            appState.testFunc = static_cast<TestFunc>(selectedFuncIndex);
+            populateFunctionMeshes();
+        }
+        ImGui::Dummy(ImVec2(0.0f, 5.0f));
     }
-    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::EndDisabled();
 
     if (ImGui::Button("Reset position")) {
         appState.resetPosition = true;
@@ -438,7 +450,7 @@ void Application::drawFunctionInput() {
                               ImGuiInputTextFlags_CallbackAlways, scrollToEnd, &appState);
     if (appState.functionParseError) {
         ImGui::Text("Expression is invalid, please update.");
-    } else if (meshBuilder.has_value()) {
+    } else if (backgroundInProgress()) {
         ImGui::Text("Building function mesh...");
     } else {
         ImGui::Text("Press enter to apply.");

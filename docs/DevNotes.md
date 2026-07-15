@@ -39,4 +39,4 @@ We upgraded our version of the ImGui library and that fixed it.
 
 ## Some interesting example functions
 
-+ `0.1*sin(100*x*z)`
++ `0.1*sin(100*u*v)`

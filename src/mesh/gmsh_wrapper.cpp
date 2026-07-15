@@ -157,7 +157,7 @@ VertsAndIndices runGmsh(const std::string &functionExpr) {
 
     gmsh::initialize(0, nullptr, false);
 
-    static constexpr double MESH_SIZE = 0.02;
+    static constexpr double MESH_SIZE = 0.015;
     static constexpr bool COLLAPSE_Z  = false;
 
     buildMesh(functionExpr, DEFAULT_DOMAIN, MESH_SIZE, COLLAPSE_Z);

@@ -13,11 +13,11 @@ _Graph of radial sinc function._
 
 ## Mouse controls
 
-| Input                    | Action            |
-| ------------------------ | ----------------- |
-| `click + drag`           | rotate graph      |
-| `control + click + drag` | translate graph   |
-| `mouse wheel`            | zoom graph        |
+| Input                    | Action          |
+| ------------------------ | --------------- |
+| `click + drag`           | rotate graph    |
+| `control + click + drag` | translate graph |
+| `mouse wheel`            | zoom graph      |
 
 ## User function input
 
@@ -67,13 +67,21 @@ material model. The PBR shading implementation closely follows the examples from
 [learnopengl.com](https://learnopengl.com/). The GUI has sliders to adjust the surface color
 and PBR metallic and roughness properties.
 
+## Optional Gmsh backend
+
+There is now the option to use the open-source [Gmsh](https://gmsh.info/) finite element mesh generation
+library as an alternative to the built-in mesh generator.
+
 ## Build instructions
 
 There is a CMake build system, but you can use the Makefile as a convenience.
 
 ```bash
-# Apologies if you need more; need to test from a clean env.
-sudo apt install libvulkan-dev libglfw3-dev glslang-tools
+# Clone submodules.
+git submodule update --init --recursive
+
+# You may need a few more than these, depending on your system.
+sudo apt install libvulkan-dev libglfw3-dev glslang-tools libfltk-dev
 
 make configure
 make build
@@ -81,7 +89,7 @@ make build
 # Compile the shaders.
 make shaderc
 
-# Run built application in build/src/renderer-app.
+# Run built application in build/release/bin/renderer-app.
 make run
 ```
 
@@ -103,5 +111,8 @@ we use the [mathspresso](https://github.com/kobalicek/mathpresso) library, which
 under a permissive license. We have also looked at Sascha Willems'
 Vulkan-glTF-PBR model viewer for inspiration, which is available [here](https://github.com/SaschaWillems/Vulkan-glTF-PBR).
 And we have learned many graphics concepts from the excellent site [learnopengl.com](https://learnopengl.com/).
+
+Gmsh has the GPL license, but this application only interacts with Gmsh through its public API
+as an optional add-on feature.
 
 This software is released under the MIT license.

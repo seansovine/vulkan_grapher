@@ -45,6 +45,8 @@ private:
 
     void meshBuilderThreadPtr(const FuncXZPtr func);
     void meshBuilderThreadUser(std::shared_ptr<UserFunction> func);
+    void meshBuilderThreadGmsh(std::string funcExpression);
+    bool backgroundInProgress();
 
 private:
     static constexpr uint32_t INITIAL_WINDOW_WIDTH  = 1500;
@@ -69,7 +71,7 @@ private:
 
     std::optional<std::thread> meshBuilder = std::nullopt;
     // Set by mesh builder thread, cleared by main thread.
-    std::atomic_bool meshReady = false;
+    std::atomic_bool backgroundWorkReady = false;
 };
 
 #endif // APPLICATION_H_
