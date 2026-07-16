@@ -88,6 +88,8 @@ VertsAndIndices gmshToIndexed() {
     indexedMesh.vertices.reserve(nodeTags.size());
     std::unordered_map<std::size_t, uint32_t> tagToIndex;
 
+    static constexpr glm::vec3 FUNCT_COLOR = {0.070f, 0.336f, 0.594f};
+
     for (size_t i = 0; i < nodeTags.size(); ++i) {
         tagToIndex[nodeTags[i]] = i;
 
@@ -97,6 +99,7 @@ VertsAndIndices gmshToIndexed() {
         v.pos.z = coords[3 * i + 1];
         // We use "OpenGL coordinates" where y is up.
 
+        v.color = FUNCT_COLOR;
         indexedMesh.vertices.push_back(v);
     }
 

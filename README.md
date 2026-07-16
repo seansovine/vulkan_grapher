@@ -72,6 +72,13 @@ and PBR metallic and roughness properties.
 There is now the option to use the open-source [Gmsh](https://gmsh.info/) finite element mesh generation
 library as an alternative to the built-in mesh generator.
 
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/gmsh_exp_sine_example.png" alt="drawing" width="600" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
+I plan to add support for other third-party mesh generation backends, including [CGAL](https://www.cgal.org/),
+in the near future. This will be done using a plugin system.
+
 ## Build instructions
 
 There is a CMake build system, but you can use the Makefile as a convenience.
@@ -112,7 +119,9 @@ under a permissive license. We have also looked at Sascha Willems'
 Vulkan-glTF-PBR model viewer for inspiration, which is available [here](https://github.com/SaschaWillems/Vulkan-glTF-PBR).
 And we have learned many graphics concepts from the excellent site [learnopengl.com](https://learnopengl.com/).
 
-Gmsh has the GPL license, but this application only interacts with Gmsh through its public API
+Gmsh has the GPL license. This application only interacts with Gmsh through its public API
 as an optional add-on feature.
 
-This software is released under the MIT license.
+This software is released under the GPL license for now, because of the Gmsh dependency.
+But I'm working on a version that communicates with external mesh backgrounds using inter-process
+communication, so that the main program can have a more permissive license like MIT.
