@@ -1,6 +1,7 @@
 ColumnLimit: 120
 IndentWidth: 4
 AccessModifierOffset: -4
+IndentCaseLabels: true
 
 AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: None

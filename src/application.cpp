@@ -146,17 +146,17 @@ bool Application::backgroundInProgress() {
 
 void Application::populateFunctionMeshes() {
     switch (appState.meshGenerator) {
-    case MeshGenerator::BuiltIn: {
-        populateMeshesBuiltIn();
-        break;
-    }
-    case MeshGenerator::Gmsh: {
-        populateMeshesGmsh();
-        break;
-    }
-    default: {
-        throw std::runtime_error("Invalid mesh generator setting.");
-    }
+        case MeshGenerator::BuiltIn: {
+            populateMeshesBuiltIn();
+            break;
+        }
+        case MeshGenerator::Gmsh: {
+            populateMeshesGmsh();
+            break;
+        }
+        default: {
+            throw std::runtime_error("Invalid mesh generator setting.");
+        }
     }
 }
 
@@ -166,34 +166,34 @@ void Application::populateMeshesBuiltIn() {
     spdlog::debug("Building function meshes.");
 
     switch (appState.testFunc) {
-    case TestFunc::Parabolic: {
-        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_PARABOLIC);
-        break;
-    }
-    case TestFunc::ShiftedSinc: {
-        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
-        break;
-    }
-    case TestFunc::ExpSine: {
-        meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
-        break;
-    }
-    case TestFunc::UserInput: {
-        if (appState.textBufferLen() == 0) {
-            userFunction                = nullptr;
-            appState.functionParseError = false;
-            return;
+        case TestFunc::Parabolic: {
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_PARABOLIC);
+            break;
         }
-        if (userFunction == nullptr) {
-            return;
+        case TestFunc::ShiftedSinc: {
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
+            break;
         }
-        meshBuilder  = std::thread(&Application::meshBuilderThreadUser, this, std::move(userFunction));
-        userFunction = nullptr;
-        break;
-    }
-    default: {
-        throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
-    }
+        case TestFunc::ExpSine: {
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
+            break;
+        }
+        case TestFunc::UserInput: {
+            if (appState.textBufferLen() == 0) {
+                userFunction                = nullptr;
+                appState.functionParseError = false;
+                return;
+            }
+            if (userFunction == nullptr) {
+                return;
+            }
+            meshBuilder  = std::thread(&Application::meshBuilderThreadUser, this, std::move(userFunction));
+            userFunction = nullptr;
+            break;
+        }
+        default: {
+            throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
+        }
     }
 }
 
@@ -202,29 +202,29 @@ void Application::populateMeshesGmsh() {
 
     std::string functionExpression{};
     switch (appState.testFunc) {
-    case TestFunc::Parabolic: {
-        functionExpression = math_util::gmsh::TEST_FUNCTION_PARABOLIC_EXPR_;
-        break;
-    }
-    case TestFunc::ShiftedSinc: {
-        functionExpression = math_util::gmsh::TEST_FUNCTION_SINC_EXPR_;
-        break;
-    }
-    case TestFunc::ExpSine: {
-        functionExpression = math_util::gmsh::TEST_FUNCTION_EXP_SINE_EXPR_;
-        break;
-    }
-    case TestFunc::UserInput: {
-        if (appState.textBufferLen() != 0) {
-            functionExpression = appState.functionInputBuffer.data();
-        } else {
-            return;
+        case TestFunc::Parabolic: {
+            functionExpression = math_util::gmsh::TEST_FUNCTION_PARABOLIC_EXPR_;
+            break;
         }
-        break;
-    }
-    default: {
-        throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
-    }
+        case TestFunc::ShiftedSinc: {
+            functionExpression = math_util::gmsh::TEST_FUNCTION_SINC_EXPR_;
+            break;
+        }
+        case TestFunc::ExpSine: {
+            functionExpression = math_util::gmsh::TEST_FUNCTION_EXP_SINE_EXPR_;
+            break;
+        }
+        case TestFunc::UserInput: {
+            if (appState.textBufferLen() != 0) {
+                functionExpression = appState.functionInputBuffer.data();
+            } else {
+                return;
+            }
+            break;
+        }
+        default: {
+            throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
+        }
     }
 
     meshBuilder = std::thread(&Application::meshBuilderThreadGmsh, this, std::move(functionExpression));
@@ -320,21 +320,21 @@ void Application::handleMeshGeneratorChange() {
     }
 
     switch (appState.meshGenerator) {
-    case MeshGenerator::BuiltIn: {
-        if (appState.testFunc == TestFunc::UserInput) {
-            tryGetUserFunction();
-        } else {
-            populateFunctionMeshes();
+        case MeshGenerator::BuiltIn: {
+            if (appState.testFunc == TestFunc::UserInput) {
+                tryGetUserFunction();
+            } else {
+                populateFunctionMeshes();
+            }
+            break;
         }
-        break;
-    }
-    case MeshGenerator::Gmsh: {
-        populateFunctionMeshes();
-        break;
-    }
-    default: {
-        throw std::runtime_error("Invalid mesh generator in handleMeshGeneratorChange.");
-    }
+        case MeshGenerator::Gmsh: {
+            populateFunctionMeshes();
+            break;
+        }
+        default: {
+            throw std::runtime_error("Invalid mesh generator in handleMeshGeneratorChange.");
+        }
     }
 }
 

@@ -207,18 +207,18 @@ void FunctionMesh::refine(SharedSquare square) {
     if constexpr (SHOW_REFINEMENT) {
 
         switch (square->depth) {
-        case 0: {
-            funcColor = REFINE_DEBUG_COLOR1;
-            break;
-        }
-        case 1: {
-            funcColor = REFINE_DEBUG_COLOR2;
-            break;
-        }
-        default: {
-            funcColor = REFINE_DEBUG_COLOR3;
-            break;
-        }
+            case 0: {
+                funcColor = REFINE_DEBUG_COLOR1;
+                break;
+            }
+            case 1: {
+                funcColor = REFINE_DEBUG_COLOR2;
+                break;
+            }
+            default: {
+                funcColor = REFINE_DEBUG_COLOR3;
+                break;
+            }
         }
 
         mFunctionMeshVertices[square->topLeftIdx].color     = funcColor;
