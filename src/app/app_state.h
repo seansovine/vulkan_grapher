@@ -32,14 +32,20 @@ static constexpr std::array<const char *, static_cast<size_t>(TestFunc::NUM_FUNC
 };
 
 enum class MeshGenerator : uint8_t {
-    BuiltIn        = 0,
+    BuiltIn = 0,
+#ifdef BUILD_GMSH
     Gmsh           = 1,
     NUM_GENERATORS = 2,
+#else
+    NUM_GENERATORS = 1,
+#endif
 };
 
 static constexpr std::array<const char *, static_cast<size_t>(MeshGenerator::NUM_GENERATORS)> generatorNames = {
     "Built-in", //
-    "Gmsh",     //
+#ifdef BUILD_GMSH
+    "Gmsh", //
+#endif
 };
 
 // User input data that is handled in renderer.

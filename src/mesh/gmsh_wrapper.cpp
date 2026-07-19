@@ -1,17 +1,20 @@
 #include "gmsh_wrapper.h"
 
+#ifdef BUILD_GMSH
+
 #include "mesh.h"
 #include "mesh_util.h"
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
+#include <gmsh.h>
+#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <gmsh.h>
 #include <iterator>
-#include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -172,3 +175,15 @@ VertsAndIndices runGmsh(const std::string &functionExpr) {
 }
 
 } // namespace gmsh_wrapper
+
+#else
+
+namespace gmsh_wrapper {
+
+VertsAndIndices runGmsh(const std::string &_) {
+    return {};
+}
+
+} // namespace gmsh_wrapper
+
+#endif

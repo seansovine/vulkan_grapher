@@ -41,11 +41,11 @@ private:
     void drawFrame();
     void populateFunctionMeshes();
     void populateMeshesBuiltIn();
-    void populateMeshesGmsh();
+    void populateMeshesExternal();
 
     void meshBuilderThreadPtr(const FuncXZPtr func);
     void meshBuilderThreadUser(std::shared_ptr<UserFunction> func);
-    void meshBuilderThreadGmsh(std::string funcExpression);
+    void meshBuilderThreadExternal(std::string funcExpression);
     bool backgroundInProgress();
 
 private:
@@ -66,7 +66,7 @@ private:
     WindowEvents windowEvents;
 
     std::shared_ptr<UserFunction> userFunction = nullptr;
-    // The main thread only touches these while meshReady is true.
+    // The main thread only touches these while backgroundWorkReady is true.
     std::array<IndexedMesh, 2> meshesToRender;
 
     std::optional<std::thread> meshBuilder = std::nullopt;

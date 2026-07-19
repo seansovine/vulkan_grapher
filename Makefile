@@ -15,6 +15,9 @@ build-debug: src
 configure: src
 	@cmake . -DCMAKE_BUILD_TYPE=Release -B build/release
 
+configure-gmsh: src
+	@cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_GMSH=ON -B build/release
+
 configure-debug: src
 	@cmake . -DCMAKE_BUILD_TYPE=Debug -B build/debug
 

@@ -3,8 +3,6 @@
 
 #include "mesh.h"
 
-#include <gmsh.h>
-
 namespace gmsh_wrapper {
 
 struct VertsAndIndices {

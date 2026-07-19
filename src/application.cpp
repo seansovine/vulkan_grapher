@@ -123,7 +123,7 @@ void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func) {
     backgroundWorkReady = true;
 }
 
-void Application::meshBuilderThreadGmsh(std::string funcExpression) {
+void Application::meshBuilderThreadExternal(std::string funcExpression) {
     // Call into Gmsh wrapper; this version blocks main thread, for initial testing.
     gmsh_wrapper::VertsAndIndices vertsAndInds{};
     try {
@@ -150,10 +150,12 @@ void Application::populateFunctionMeshes() {
             populateMeshesBuiltIn();
             break;
         }
+#ifdef BUILD_GMSH
         case MeshGenerator::Gmsh: {
-            populateMeshesGmsh();
+            populateMeshesExternal();
             break;
         }
+#endif
         default: {
             throw std::runtime_error("Invalid mesh generator setting.");
         }
@@ -197,7 +199,7 @@ void Application::populateMeshesBuiltIn() {
     }
 }
 
-void Application::populateMeshesGmsh() {
+void Application::populateMeshesExternal() {
     spdlog::debug("Building function meshes with Gmsh.");
 
     std::string functionExpression{};
@@ -227,7 +229,7 @@ void Application::populateMeshesGmsh() {
         }
     }
 
-    meshBuilder = std::thread(&Application::meshBuilderThreadGmsh, this, std::move(functionExpression));
+    meshBuilder = std::thread(&Application::meshBuilderThreadExternal, this, std::move(functionExpression));
 }
 
 void Application::initVulkan() {
@@ -328,10 +330,12 @@ void Application::handleMeshGeneratorChange() {
             }
             break;
         }
+#ifdef BUILD_GMSH
         case MeshGenerator::Gmsh: {
             populateFunctionMeshes();
             break;
         }
+#endif
         default: {
             throw std::runtime_error("Invalid mesh generator in handleMeshGeneratorChange.");
         }
@@ -383,12 +387,14 @@ void Application::drawUI() {
 
     ImGui::BeginDisabled(backgroundInProgress());
     {
+#ifdef INCLUDE_EXTERNAL_BACKENDS
         static int selectedMeshGenIndex = appState.meshGeneratorIndex();
         if (ImGui::Combo("Mesh generator", &selectedMeshGenIndex, generatorNames.data(), generatorNames.size())) {
             appState.meshGenerator = static_cast<MeshGenerator>(selectedMeshGenIndex);
             handleMeshGeneratorChange();
         }
         ImGui::Dummy(ImVec2(0.0f, 5.0f));
+#endif
 
         static int selectedFuncIndex = appState.selectedFuncIndex();
         if (ImGui::Combo("Choose function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
@@ -448,6 +454,7 @@ void Application::drawFunctionInput() {
     ImGui::InputTextMultiline("user-func", appState.functionInputBuffer.data(), //
                               appState.functionInputBuffer.size(), ImVec2(-1.0f, 50.0f),
                               ImGuiInputTextFlags_CallbackAlways, scrollToEnd, &appState);
+
     if (appState.functionParseError) {
         ImGui::Text("Expression is invalid, please update.");
     } else if (backgroundInProgress()) {
