@@ -93,7 +93,7 @@ class FunctionMesh {
     static constexpr bool DIRECT_NORMALS   = false;
 
     // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int NUM_CELLS = 200;
+    static constexpr int NUM_CELLS = 150;
 
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.

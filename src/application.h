@@ -34,7 +34,7 @@ private:
 
     void drawUI();
     void drawFunctionInput();
-    void handleUserInput();
+    bool handleUserInput();
     void tryGetUserFunction();
     void handleMeshGeneratorChange();
 

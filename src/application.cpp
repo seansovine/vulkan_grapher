@@ -266,7 +266,10 @@ void Application::run() {
 
         ImGuiIO &io = ImGui::GetIO();
         windowEvents.setGuiWantsInputs(io.WantCaptureMouse, io.WantCaptureKeyboard);
-        handleUserInput();
+        if (handleUserInput()) {
+            vulkan.waitForDeviceIdle();
+            break;
+        }
 
         drawFrame();
         auto now     = std::chrono::high_resolution_clock::now();
@@ -296,8 +299,6 @@ void Application::run() {
             backgroundWorkReady = false;
         }
     }
-
-    vulkan.waitForDeviceIdle();
 }
 
 void Application::tryGetUserFunction() {
@@ -342,13 +343,18 @@ void Application::handleMeshGeneratorChange() {
     }
 }
 
-void Application::handleUserInput() {
+bool Application::handleUserInput() {
     UserGuiInput userInput = appState.takerUserGuiInput();
+    if (userInput.escapePressed) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        return true;
+    }
     if (appState.testFunc == TestFunc::UserInput && userInput.enterPressed && meshBuilder == std::nullopt) {
         appState.trimFunctionInput();
         appState.functionInputCursorReset = true;
         tryGetUserFunction();
     }
+    return false;
 }
 
 void Application::drawFrame() {

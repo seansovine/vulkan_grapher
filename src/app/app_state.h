@@ -59,7 +59,8 @@ struct UserGraphInput {
 
 // User input that is handled in user interface.
 struct UserGuiInput {
-    bool enterPressed = false;
+    bool escapePressed = false;
+    bool enterPressed  = false;
 };
 
 struct AppState {
@@ -234,7 +235,7 @@ public:
             return;
         }
         if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q) {
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
+            thisPtr->appState->userGuiInput.escapePressed = true;
         }
         if (action == GLFW_PRESS && key == 341) {
             thisPtr->controlDown = true;
