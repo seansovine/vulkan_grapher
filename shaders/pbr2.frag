@@ -21,6 +21,7 @@ layout(set = 1, binding = 0) uniform ModelUniform {
 struct VertexOut {
     vec3 tangentLightOffset[2];
     vec3 tangentViewOffset;
+    vec3 worldPosition;
 };
 
 layout(location = 0) in VertexOut vIn;
@@ -34,10 +35,18 @@ layout(location = 0) out vec4 outColor;
 const float PI = 3.14159265359;
 
 // Cited as RGB for noon sunlight.
-const vec3 lightColor = vec3(1.0, 1.0, 0.9843);
+const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 0.9843);
 
 // For now we give everything an outward unit normal.
 const vec3 N = vec3(0.0, 0.0, 1.0);
+
+// ---------
+
+// Color effects:
+//  0 = none
+//  1 = color blend based on tangent y-value
+//  2 = color blend based on world y-value
+const uint USE_COLOR_EFFECT = 2;
 
 // ---------
 
@@ -51,7 +60,23 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0);
 void main() {
     vec3 V = normalize(vIn.tangentViewOffset);
 
-    vec3 albedo = modelUbo.meshColor;
+    vec3 albedo;
+    if (USE_COLOR_EFFECT == 1)
+    {
+        float t = (V.y + 1.0) * 0.5;
+        albedo =  t * vec3(0.0, 0.0, 1.0) + (1.0 - t) * vec3(1.0, 0.0, 0.0);
+    }
+    else if (USE_COLOR_EFFECT == 2)
+    {
+        vec3 worldPos = vIn.worldPosition;
+        float t = clamp((worldPos.y + 0.5) * 1.25, 0.0, 1.0);
+        albedo =  t * vec3(0.0, 0.0, 1.0) + (1.0 - t) * vec3(1.0, 0.0, 0.0);
+    }
+    else
+    {
+        albedo = modelUbo.meshColor;
+    }
+
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, modelUbo.metallic);
 
@@ -62,7 +87,7 @@ void main() {
         vec3 H = normalize(V + L);
         float distance    = length(L);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance     = lightColor * attenuation;
+        vec3 radiance     = LIGHT_COLOR * attenuation;
 
         float NDF = DistributionGGX(N, H, modelUbo.roughness);
         float G   = GeometrySmith(N, V, L, modelUbo.roughness);

@@ -42,3 +42,11 @@ We upgraded our version of the ImGui library and that fixed it.
 - `0.1*sin(100*u*v)`
 
 - `0.1*sin(25*u*v) + 0.05*cos(100*u*v)`
+
+Interesting to vary the component weights and exponent here:
+
+- `1 / (pow(4.0*pow(u-0.5,2) + pow(v-0.5,2), 0.75) + 0.75)`
+
+For example:
+
+- `1 / (pow(10.0*pow(u-0.5,2) + pow(v-0.5,2), 0.125) + 0.75)`

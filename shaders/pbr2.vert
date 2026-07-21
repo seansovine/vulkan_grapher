@@ -29,6 +29,7 @@ layout(location = 4) in vec3 inNormal;
 struct VertexOut {
     vec3 tangentLightOffset[2];
     vec3 tangentViewOffset;
+    vec3 worldPosition;
 };
 
 layout(location = 0) out VertexOut vOut;
@@ -40,6 +41,7 @@ const vec3 lightPos[2] = {vec3(-2.0, 5.0, 2.0), vec3(2.0, 5.0, 2.0)};
 void main() {
     vec4 worldPos = modelUbo.model * vec4(inPosition, 1.0);
     gl_Position = cameraUbo.proj * cameraUbo.view * worldPos;
+    vOut.worldPosition = worldPos.xyz;
 
     mat3 modelRot = mat3(modelUbo.model);
     vec3 T = modelRot * inTangent;

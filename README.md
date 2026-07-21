@@ -116,6 +116,19 @@ that reasonably quickly. However there is also more that can be done to improve 
 I plan to add support for other third-party mesh generation backends, including [CGAL](https://www.cgal.org/),
 in the near future. This will be done using a plugin system.
 
+## Experimental
+
+Here are some experimental features I'm trying out for fun.
+
+_Height-based color blend:_
+
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/color_effects_height.png"
+		alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
+There's currently a constant for the color effect in the `pbr2.frag` shader.
+
 ## Build instructions
 
 There is a CMake build system, but you can use the Makefile as a convenience.
