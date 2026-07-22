@@ -403,13 +403,19 @@ void Application::drawUI() {
 #endif
 
         static int selectedFuncIndex = appState.selectedFuncIndex();
-        if (ImGui::Combo("Choose function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
+        if (ImGui::Combo("Function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {
             appState.testFunc = static_cast<TestFunc>(selectedFuncIndex);
             populateFunctionMeshes();
         }
         ImGui::Dummy(ImVec2(0.0f, 5.0f));
     }
     ImGui::EndDisabled();
+
+    static int colorEffectIndex = appState.colorEffectIndex();
+    if (ImGui::Combo("Color effect", &colorEffectIndex, colorEffectNames.data(), colorEffectNames.size())) {
+        appState.colorEffect = static_cast<ColorEffect>(colorEffectIndex);
+    }
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
     if (ImGui::Button("Reset position")) {
         appState.resetPosition = true;

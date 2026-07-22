@@ -106,8 +106,9 @@ public:
     }
 
     void updateFromAppState(const AppState &appState) {
-        ubo.metallic  = appState.metallic;
-        ubo.roughness = appState.roughness;
+        ubo.metallic    = appState.metallic;
+        ubo.roughness   = appState.roughness;
+        ubo.colorEffect = appState.colorEffectIndex();
     }
 
     void updateColor(glm::vec3 color) {

@@ -48,6 +48,19 @@ static constexpr std::array<const char *, static_cast<size_t>(MeshGenerator::NUM
 #endif
 };
 
+enum class ColorEffect : uint8_t {
+    None         = 0,
+    HeightBased  = 1,
+    TangentBased = 2,
+    NUM_EFFECTS  = 3,
+};
+
+static constexpr std::array<const char *, static_cast<size_t>(ColorEffect::NUM_EFFECTS)> colorEffectNames = {
+    "None",          //
+    "Height-based",  //
+    "Tangent-based", //
+};
+
 // User input data that is handled in renderer.
 struct UserGraphInput {
     double xUserRot   = 0.0;
@@ -69,6 +82,9 @@ struct AppState {
 
     // Backend to use for mesh generation.
     MeshGenerator meshGenerator = MeshGenerator::BuiltIn;
+
+    // Experimental color effect mode.
+    ColorEffect colorEffect = ColorEffect::None;
 
     // User function input.
     static constexpr size_t INPUT_BUFFER_LEN               = 1024;
@@ -107,12 +123,16 @@ public:
         return std::exchange(userGuiInput, {});
     }
 
-    size_t selectedFuncIndex() {
+    size_t selectedFuncIndex() const {
         return static_cast<size_t>(testFunc);
     }
 
-    size_t meshGeneratorIndex() {
+    size_t meshGeneratorIndex() const {
         return static_cast<size_t>(meshGenerator);
+    }
+
+    size_t colorEffectIndex() const {
+        return static_cast<size_t>(colorEffect);
     }
 
     size_t textBufferLen() {

@@ -127,8 +127,6 @@ _Height-based color blend:_
 		alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
-There's currently a constant for the color effect in the `pbr2.frag` shader.
-
 ## Build instructions
 
 There is a CMake build system, but you can use the Makefile as a convenience.

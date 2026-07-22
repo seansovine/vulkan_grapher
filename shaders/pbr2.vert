@@ -10,10 +10,11 @@ layout(set = 0, binding = 0) uniform CameraUniform {
 } cameraUbo;
 
 layout(set = 1, binding = 0) uniform ModelUniform {
-    mat4 model;
-    vec3 _meshColor;
+    mat4  model;
+    vec3  _meshColor;
     float _roughness;
     float _metallic;
+    int   _colorEffect;
 } modelUbo;
 
 // Inputs.

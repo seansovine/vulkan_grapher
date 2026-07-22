@@ -10,10 +10,11 @@ layout(set = 0, binding = 0) uniform CameraUniform {
 } cameraUbo;
 
 layout(set = 1, binding = 0) uniform ModelUniform {
-    mat4 _model;
-    vec3 meshColor;
+    mat4  _model;
+    vec3  meshColor;
     float roughness;
     float metallic;
+    int   colorEffect;
 } modelUbo;
 
 // Inputs.
@@ -42,14 +43,6 @@ const vec3 N = vec3(0.0, 0.0, 1.0);
 
 // ---------
 
-// Color effects:
-//  0 = none
-//  1 = color blend based on tangent y-value
-//  2 = color blend based on world y-value
-const uint USE_COLOR_EFFECT = 2;
-
-// ---------
-
 // Credit: The code here is adapted from the example on learnopengl.com.
 
 float DistributionGGX(vec3 N, vec3 H, float roughness);
@@ -59,14 +52,18 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0);
 
 void main() {
     vec3 V = normalize(vIn.tangentViewOffset);
-
     vec3 albedo;
-    if (USE_COLOR_EFFECT == 1)
+
+    // Color effects:
+    //  0 = none
+    //  1 = color blend based on tangent y-value
+    //  2 = color blend based on world y-value
+    if (modelUbo.colorEffect == 2)
     {
         float t = (V.y + 1.0) * 0.5;
         albedo =  t * vec3(0.0, 0.0, 1.0) + (1.0 - t) * vec3(1.0, 0.0, 0.0);
     }
-    else if (USE_COLOR_EFFECT == 2)
+    else if (modelUbo.colorEffect == 1)
     {
         vec3 worldPos = vIn.worldPosition;
         float t = clamp((worldPos.y + 0.5) * 1.25, 0.0, 1.0);

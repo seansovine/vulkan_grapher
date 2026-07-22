@@ -21,6 +21,8 @@ struct ModelUniform {
     // PBR parameters.
     glm::float32 roughness = 0.0;
     glm::float32 metallic  = 0.0;
+    // See ColorEffect enum.
+    glm::i32 colorEffect = 0;
 };
 
 static constexpr float DIST_COMP              = 1.5f;
