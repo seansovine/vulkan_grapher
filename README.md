@@ -127,6 +127,13 @@ _Height-based color blend:_
 		alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
+_Tangent-based color blend:_
+
+<p align="center" margin="20px">
+	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/color_effects_tangent.png"
+		alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
+</p>
+
 ## Build instructions
 
 There is a CMake build system, but you can use the Makefile as a convenience.

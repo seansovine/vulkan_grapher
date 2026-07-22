@@ -50,3 +50,5 @@ Interesting to vary the component weights and exponent here:
 For example:
 
 - `1 / (pow(10.0*pow(u-0.5,2) + pow(v-0.5,2), 0.125) + 0.75)`
+
+- `0.1*sin(10*cos(3*u)*cos(10*v))`
