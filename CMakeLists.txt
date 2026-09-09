@@ -23,8 +23,12 @@ if(BUILD_GMSH)
 
     # Gmsh's shared librar target is awkwardly named.
     set(GMSH_SHARED shared)
+
+    # Silence warnings from Gmsh build.
+    target_compile_options(shared PRIVATE -w)
+
     if(NOT TARGET ${GMSH_SHARED})
-        message(FATAL_ERROR "GMSH_SHARED shared library was not found.")
+        message(FATAL_ERROR "Gmsh is not configured to build shared library.")
     endif()
 
     add_compile_definitions(BUILD_GMSH INCLUDE_EXTERNAL_BACKENDS)
