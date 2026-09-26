@@ -5,12 +5,14 @@ A work-in-progress 3D function grapher built with C++ + Vulkan + Dear ImGui.
 We have previously written a version of the function grapher using C++ + OpenGL in [opengl_examples](https://github.com/seansovine/opengl_examples),
 and a more full-featured version using Rust + wgpu + egui in [wgpu_grapher](https://github.com/seansovine/wgpu_grapher).
 
+_Graph of radial sinc function._
+
 <p align="center" margin="20px">
 	<img src="https://raw.githubusercontent.com/seansovine/page_images/refs/heads/main/screenshots/vulkan_grapher/radial_sinc_blue.png"
 		alt="drawing" width="700" style="padding-top: 10px; padding-bottom: 10px"/>
 </p>
 
-_Graph of radial sinc function._
+[Dev Notes](docs/DevNotes.md) has some more examples and discussion.
 
 ## Mouse controls
 
