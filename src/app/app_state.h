@@ -13,8 +13,8 @@
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 
-// -------------------------
-// Global application state.
+// ------------------
+// GUI dropdown data.
 
 enum class TestFunc : uint8_t {
     Parabolic   = 0,
@@ -61,6 +61,34 @@ static constexpr std::array<const char *, static_cast<size_t>(ColorEffect::NUM_E
     "Tangent-based", //
 };
 
+enum class MeshSize : uint8_t {
+    N250,
+    N300,
+    N350,
+    N400,
+    N450,
+    NUM_SIZES,
+};
+
+static constexpr std::array<const char *, static_cast<size_t>(MeshSize::NUM_SIZES)> meshSizeNames = {
+    "250", //
+    "300", //
+    "350", //
+    "400", //
+    "450", //
+};
+
+static constexpr std::array<uint32_t, static_cast<size_t>(MeshSize::NUM_SIZES)> meshSizeValues = {
+    250, //
+    300, //
+    350, //
+    400, //
+    450, //
+};
+
+// -------------------------
+// Global application state.
+
 // User input data that is handled in renderer.
 struct UserGraphInput {
     double xUserRot   = 0.0;
@@ -82,6 +110,9 @@ struct AppState {
 
     // Backend to use for mesh generation.
     MeshGenerator meshGenerator = MeshGenerator::BuiltIn;
+
+    // Number of subdivisions per side in base (unrefined) mesh.
+    MeshSize meshSize = MeshSize::N300;
 
     // Experimental color effect mode.
     ColorEffect colorEffect = ColorEffect::None;
@@ -129,6 +160,14 @@ public:
 
     size_t meshGeneratorIndex() const {
         return static_cast<size_t>(meshGenerator);
+    }
+
+    size_t meshSizeIndex() const {
+        return static_cast<size_t>(meshSize);
+    }
+
+    size_t meshSizeValue() const {
+        return meshSizeValues.at(meshSizeIndex());
     }
 
     size_t colorEffectIndex() const {

@@ -1,12 +1,13 @@
 #include "application.h"
 
-#include "app_state.h"
-#include "function_mesh.h"
-#include "gmsh_wrapper.h"
-#include "mesh.h"
-#include "user_function.h"
-#include "util.h"
 #include "vulkan_wrapper.h"
+
+#include <app_state.h>
+#include <function_mesh.h>
+#include <gmsh_wrapper.h>
+#include <mesh.h>
+#include <user_function.h>
+#include <util.h>
 
 #include <GLFW/glfw3.h>
 #include <imgui/backends/imgui_impl_glfw.h>
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -107,16 +109,26 @@ void Application::initUI() {
         });
 }
 
-void Application::meshBuilderThreadPtr(const FuncXZPtr func) {
-    FunctionMesh mesh{func};
+void Application::meshBuilderThreadPtr(const FuncXZPtr func, uint32_t meshSize) {
+    currentFunction = func;
+    FunctionMesh mesh{func, meshSize};
     auto floorMesh      = FunctionMesh::simpleFloorMesh();
     meshesToRender      = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
                            IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
     backgroundWorkReady = true;
 }
 
-void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func) {
-    FunctionMesh mesh{*func};
+void Application::meshBuilderThreadUser(std::shared_ptr<UserFunction> func, uint32_t meshSize) {
+    currentFunction = *func;
+    FunctionMesh mesh{*func, meshSize};
+    auto floorMesh      = FunctionMesh::simpleFloorMesh();
+    meshesToRender      = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
+                           IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
+    backgroundWorkReady = true;
+}
+
+void Application::meshBuilderThreadGeneric(std::function<FuncXZ> func, uint32_t meshSize) {
+    FunctionMesh mesh{std::move(func), meshSize};
     auto floorMesh      = FunctionMesh::simpleFloorMesh();
     meshesToRender      = {IndexedMesh{std::move(mesh.functionVertices()), std::move(mesh.meshIndices())},
                            IndexedMesh{std::move(floorMesh.vertices), std::move(floorMesh.indices)}};
@@ -169,15 +181,18 @@ void Application::populateMeshesBuiltIn() {
 
     switch (appState.testFunc) {
         case TestFunc::Parabolic: {
-            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_PARABOLIC);
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_PARABOLIC,
+                                      appState.meshSizeValue());
             break;
         }
         case TestFunc::ShiftedSinc: {
-            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_SINC_USER);
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_SINC_USER,
+                                      appState.meshSizeValue());
             break;
         }
         case TestFunc::ExpSine: {
-            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE);
+            meshBuilder = std::thread(&Application::meshBuilderThreadPtr, this, TEST_FUNCTION_SHIFTED_SCALED_EXP_SINE,
+                                      appState.meshSizeValue());
             break;
         }
         case TestFunc::UserInput: {
@@ -189,7 +204,8 @@ void Application::populateMeshesBuiltIn() {
             if (userFunction == nullptr) {
                 return;
             }
-            meshBuilder  = std::thread(&Application::meshBuilderThreadUser, this, std::move(userFunction));
+            meshBuilder  = std::thread(&Application::meshBuilderThreadUser, this, std::move(userFunction),
+                                       appState.meshSizeValue());
             userFunction = nullptr;
             break;
         }
@@ -197,6 +213,12 @@ void Application::populateMeshesBuiltIn() {
             throw std::runtime_error("Invalid test function in populateFunctionMeshes.");
         }
     }
+}
+
+void Application::rebuildMeshesBuiltin() {
+    spdlog::debug("Rebuilding function meshes.");
+
+    meshBuilder = std::thread(&Application::meshBuilderThreadGeneric, this, currentFunction, appState.meshSizeValue());
 }
 
 void Application::populateMeshesExternal() {
@@ -401,6 +423,17 @@ void Application::drawUI() {
         }
         ImGui::Dummy(ImVec2(0.0f, 5.0f));
 #endif
+
+        static int selectedMeshSizeIndex = appState.meshSizeIndex();
+        if (appState.meshGenerator == MeshGenerator::BuiltIn) {
+            if (ImGui::Combo("Mesh size", &selectedMeshSizeIndex, meshSizeNames.data(), meshSizeNames.size())) {
+                appState.meshSize = static_cast<MeshSize>(selectedMeshSizeIndex);
+
+                if (currentFunction) {
+                    rebuildMeshesBuiltin();
+                }
+            }
+        }
 
         static int selectedFuncIndex = appState.selectedFuncIndex();
         if (ImGui::Combo("Function", &selectedFuncIndex, funcNames.data(), funcNames.size())) {

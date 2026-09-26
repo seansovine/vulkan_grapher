@@ -1,8 +1,8 @@
 #include <function_mesh.h>
-
 #include <mesh_debug.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <string>
 
@@ -22,11 +22,13 @@ static auto TEST_FUNCTION_SHIFTED_SINC = [](double x, double y) -> double {
     return 0.75 * sinc(x - 0.5, y - 0.5) + 0.25; //
 };
 
+static constexpr uint32_t MESH_SIZE = 350;
+
 int main() {
     spdlog::set_level(spdlog::level::trace);
     spdlog::info("Testing function mesh generation.");
 
-    FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC};
+    FunctionMesh mesh{TEST_FUNCTION_SHIFTED_SINC, MESH_SIZE};
     spdlog::info("Squares in top-level tessellation: {}", std::to_string(mesh.tessellationSquare().size()));
 
     float maxY = std::numeric_limits<float>::lowest();

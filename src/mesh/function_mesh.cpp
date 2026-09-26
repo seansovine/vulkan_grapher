@@ -81,11 +81,11 @@ const Square::EdgeRefinements &Square::populateRefinements() {
 // FunctionMesh implementations.
 
 void FunctionMesh::buildFloorMesh() {
-    mFloorMeshSquares.reserve(NUM_CELLS * NUM_CELLS);
-    const double width = 1.0 / NUM_CELLS;
+    mFloorMeshSquares.reserve(mNumCells * mNumCells);
+    const double width = 1.0 / mNumCells;
 
-    for (int i = 1; i <= NUM_CELLS; i++) {
-        for (int j = 1; j <= NUM_CELLS; j++) {
+    for (uint32_t i = 1; i <= mNumCells; ++i) {
+        for (uint32_t j = 1; j <= mNumCells; ++j) {
             SharedSquare square = std::make_shared<Square>();
 
             square->mTopLeft[0] = static_cast<float>((j - 1) * width);
@@ -104,7 +104,7 @@ void FunctionMesh::buildFloorMesh() {
                 westNeighbor->eastNeighbor = square;
             }
             if (i >= 2) {
-                SharedSquare northNeighbor   = mFloorMeshSquares.at((i - 2) * NUM_CELLS + (j - 1));
+                SharedSquare northNeighbor   = mFloorMeshSquares.at((i - 2) * mNumCells + (j - 1));
                 square->northNeighbor        = northNeighbor;
                 northNeighbor->southNeighbor = square;
             }
@@ -553,7 +553,7 @@ void FunctionMesh::setFuncVertTBNsDirect() {
 // New method. Once complete will replace old methods.
 void FunctionMesh::computeVerticesAndIndices() {
     mFloorMeshVertices.clear();
-    mFloorMeshVertices.reserve((NUM_CELLS + 1) * (NUM_CELLS + 1) + NUM_CELLS * NUM_CELLS);
+    mFloorMeshVertices.reserve((mNumCells + 1) * (mNumCells + 1) + mNumCells * mNumCells);
 
     for (auto &square : mFloorMeshSquares) {
         float centerX = 0.5 * (square->mTopLeft[0] + square->mBtmRight[0]);

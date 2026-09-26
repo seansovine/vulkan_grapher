@@ -92,9 +92,6 @@ class FunctionMesh {
     static constexpr bool DEBUG_REFINEMENT = false;
     static constexpr bool DIRECT_NORMALS   = false;
 
-    // Number of subdivisions of x,y axes when creating cells.
-    static constexpr int NUM_CELLS = 450;
-
     // Currently valid values are 0 and 1; we may
     // add code to support deeper refinement later.
     static constexpr uint8_t MAX_REFINEMENT_DEPTH = 2;
@@ -119,8 +116,15 @@ class FunctionMesh {
     const math_util::LogisticCutoff mSecondDerivCutoff = {SECOND_DERIV_CUTOFF, SECOND_DERIV_CUTOFF_WIDTH};
 
 public:
-    FunctionMesh(std::function<FuncXZ> &&func)
-        : mFunc(std::forward<std::function<FuncXZ>>(func)) {
+    FunctionMesh(std::function<FuncXZ> &&func, uint32_t meshSize)
+        : mFunc(std::forward<std::function<FuncXZ>>(func)),
+          mNumCells(meshSize) {
+
+        mCellWidth = 1.0 / mNumCells;
+        // Ensure we don't overlow our index type: This check is
+        // necessary, but not sufficient, because of mesh refinement.
+        assert(static_cast<uint64_t>(mNumCells) * static_cast<uint64_t>(mNumCells) < static_cast<uint64_t>(UINT32_MAX));
+
         init();
     }
 
@@ -425,13 +429,11 @@ private:
     std::function<FuncXZ> mFunc = nullptr;
     // Used to hold callable user function object or standard function pointer.
 
-    // Ensure we don't overlow our index type: This check is
-    // necessary, but not sufficient, because of mesh refinement.
-    static_assert(static_cast<uint64_t>(NUM_CELLS) * static_cast<uint64_t>(NUM_CELLS) <
-                  static_cast<uint64_t>(UINT32_MAX));
+    // Number of subdivisions of x,y axes when creating cells.
+    uint32_t mNumCells{};
 
     // = 1.0 / mNumCells.
-    static constexpr double mCellWidth = 1.0 / NUM_CELLS;
+    double mCellWidth{};
 
     // Squares that make up x,y-plane mesh.
     std::vector<SharedSquare> mFloorMeshSquares = {};
