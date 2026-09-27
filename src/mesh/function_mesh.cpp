@@ -489,27 +489,23 @@ void FunctionMesh::setFuncVertTBNs() {
 
 // NOTE:
 //
-// There is a visual artifact where there are bright spots on steep
-// parts of the surface that are parallel to the x- or z-axis when the
-// normal is computed directly from the numerical derivatives.
-// It seems to be due to a combination of the mesh grid shape, the
-// function shape, and numerical stability issues in our computations.
+// We have two ways to compute vertex normals:
 //
-// On the other hand, the method of averaging the triangle normals
-// above looks worse in parts of the graph where the curvature is high,
-// which may be due to averaging with normal computed from farther-away
-// vertices.
+//  1. Compute triangle normals and average them at each vertex.
 //
-// The setFuncVertTBNs function now tries to interpolate between each
-// version of the normals based on the magnitude of the second
-// derivative of the function as a measure of the surface curvature.
+//  2. Compute normal at each vertex directly from the function.
+//
+// It looks like each has it's strengths and weaknesses. The first one
+// averages normals from neighboring triangles, so in theory should smooth
+// out the variation in the normals. The second is more accurate, but
+// potentially amplifies the effects of numerical approximation errors.
+// We're trying these out to address some lighting artifacts we're seeing
+// on areas of the graph that are sharply curved and have rounded contours.
 //
 // Either way, there is a limit to how much accuracy we can get when the
 // features of the function are changing fast compared to the distance
-// between vertices, due to the effect of fragment interpolation. Another
-// idea is to compute the normals at a higher-resolution grid of points
-// and put them into a multidimensional texture that the fragment shader
-// can sample.
+// between vertices, due to the effect of fragment interpolation. But,
+// each of these methods seems to work reasonably well in practice.
 
 glm::dvec3 FunctionMesh::normalAtPoint(const glm::vec3 &pos) {
     double x = pos.x;
